@@ -13,7 +13,7 @@
 - Bounded background queue for tabular analyses, persistent statuses and failure/restart reporting. Run one API process; this is not a distributed task queue.
 
 ## Verification
-37 backend tests and 6 frontend component tests passed against the installed environment. Typecheck passes after correcting test-library option types. Earlier production build passed; final build and isolated locked-environment checks are pending. No browser screenshot/viewport verification: Computer Use permission not granted. All real datasets and clinical validation remain missing.
+37 backend tests passed in a fresh hash-locked project virtual environment; 6 frontend component tests passed. Typecheck and final production build pass. See TEST_RESULTS.md for commands, warnings and verification limits. No browser screenshot/viewport verification: Computer Use permission not granted. All real datasets and clinical validation remain missing.
 
 ## Remaining implementation scope (not merely data blockers)
 - Production users/roles/per-user ownership, SSO, encryption-at-rest and shared-deployment hardening.

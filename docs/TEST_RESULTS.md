@@ -21,3 +21,9 @@
 - Browser: in-app browser unavailable, native Chrome control denied with “Computer Use permissions are not granted.” Screenshots, responsive viewport checks and browser end-to-end flows NOT VERIFIED. No screenshots fabricated.
 - Hash-locked Python dependencies generated with uv for Python 3.13. Isolated installation/checks in progress; resolution alone is not runtime verification.
 - A float32 probability normalization warning in synthetic CNN evaluation was fixed by normalizing measured softmax vectors in float64 before sklearn metrics; no warning suppression. Joblib physical-core warning remains documented.
+
+## Isolated locked-environment and final build checkpoint
+- Created project `.venv` with Python 3.13.5 and installed **76 applicable packages** from `backend/requirements.lock` using `uv pip sync --require-hashes`; universal lock contains platform markers for other environments. Installation completed successfully.
+- `.venv/bin/python -m pytest backend/tests -q`: **37 passed**, 32.69s, fresh locked environment. Warnings: upstream Starlette/AnyIO deprecated BlockingPortal alias and joblib physical-core detection fallback. Neither warning was suppressed. No real dataset/model is installed by tests.
+- Final `npm run build`: passed after queued jobs, artifact charts, structured NER/sense output and frontend tests were added. `npm run typecheck` passed separately. `npm run test`: **6 passed**.
+- Temporary local preview/API processes were stopped after HTTP checks. No browser screenshot or PostgreSQL claim is made.
