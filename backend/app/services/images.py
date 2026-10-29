@@ -15,7 +15,7 @@ def decode(data: bytes) -> np.ndarray:
     try:
         with Image.open(io.BytesIO(data)) as im:
             if im.width * im.height > MAX_PIXELS or min(im.size) < 8:
-                raise ValueError('Image must contain 8–16 million pixels and have each side at least 8 pixels')
+                raise ValueError('Image must have each side at least 8 pixels and no more than 16 million pixels total')
             if im.format not in ('PNG', 'JPEG', 'WEBP'):
                 raise ValueError('Only PNG, JPEG and WebP are accepted')
             return np.asarray(ImageOps.exif_transpose(im).convert('RGB')).copy()

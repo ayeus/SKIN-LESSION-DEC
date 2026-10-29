@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
 from typing import Annotated, Literal
+from concurrent.futures import ThreadPoolExecutor
+from threading import BoundedSemaphore
 from fastapi import FastAPI, Depends, Header, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,6 +19,8 @@ from .services import images, tabular, analytics, text
 
 logging.basicConfig(level=logging.INFO,format='%(message)s'); logger=logging.getLogger('dermainsight')
 security=HTTPBearer(auto_error=False)
+executor=ThreadPoolExecutor(max_workers=2,thread_name_prefix='research-job')
+queue_slots=BoundedSemaphore(4)
 
 @asynccontextmanager
 async def lifespan(app):
@@ -53,14 +57,18 @@ async def upload_bytes(file):
     if not data: raise HTTPException(422,'Empty upload')
     return data
 
-def execute(kind,parameters,fn,dataset_id=None):
-    id=str(uuid4())
-    with Session() as s: s.add(Run(id=id,kind=kind,dataset_id=dataset_id,parameters=parameters,status='running',result={})); s.commit()
+def execute(kind,parameters,fn,dataset_id=None,run_id=None):
+    id=run_id or str(uuid4())
+    with Session() as s:
+        if run_id:
+            run=s.get(Run,id); run.status='running'
+        else: s.add(Run(id=id,kind=kind,dataset_id=dataset_id,parameters=parameters,status='running',result={}))
+        s.commit()
     try:
         result=tabular.clean_json(fn(id))
         directory=ROOT/'processed'/id; directory.mkdir(parents=True,exist_ok=True)
         (directory/'report.json').write_text(json.dumps(result,allow_nan=False,indent=2))
-        with Session() as s: run=s.get(Run,id); run.status='completed'; run.result=result; s.commit()
+        with Session() as s: run=s.get(Run,id); run.status='completed'; run.result={'artifact':'report.json'}; s.commit()
         audit(kind,id); return {'id':id,'status':'completed','result':result}
     except Exception as e:
         with Session() as s: run=s.get(Run,id); run.status='failed'; run.error=str(e); s.commit()
@@ -71,6 +79,14 @@ def execute(kind,parameters,fn,dataset_id=None):
 @app.get('/health')
 def health(): return {'status':'alive','research_only':True}
 
+def model_ready():
+    directory=os.getenv('DERMA_MODEL_DIR')
+    if not directory: return False
+    try:
+        from .services.ml import load_artifact
+        load_artifact(Path(directory)); return True
+    except (OSError,ValueError,KeyError,RuntimeError): return False
+
 @app.get('/status')
 def status(_:Protected):
     with Session() as s:
@@ -78,11 +94,12 @@ def status(_:Protected):
     return {'datasets':len(datasets),'processed_images':sum(r.kind=='image' and r.status=='completed' for r in runs),
         'runs':len(runs),'completed_runs':sum(r.status=='completed' for r in runs),'failed_runs':sum(r.status=='failed' for r in runs),
         'modalities':dict(__import__('collections').Counter(d.modality for d in datasets)),
-        'model_available':bool(os.getenv('DERMA_MODEL_DIR') and (Path(os.environ['DERMA_MODEL_DIR'])/'manifest.json').is_file()),
-        'clinical_validation':'Not established','ner':'BLOCKED: licensed clinical model not configured'}
+        'model_available':model_ready(),
+        'clinical_validation':'Not established','ner':'Configured; research-only, validation must be reviewed' if os.getenv('DERMA_NER_MODEL') else 'BLOCKED: licensed clinical model not configured'}
 
 @app.get('/datasets')
 def datasets(_:Protected):
+    audit('dataset_list','registry')
     with Session() as s: return [serialize(d) for d in s.scalars(select(Dataset).order_by(Dataset.created_at.desc()))]
 
 @app.post('/datasets')
@@ -91,9 +108,18 @@ async def import_dataset(_:Protected,file:UploadFile=File(...),modality:Literal[
     if not source.strip() or not license.strip(): raise HTTPException(422,'Source and license required')
     suffix=Path(file.filename or '').suffix.lower()
     if suffix not in ('.csv','.xlsx'): raise HTTPException(422,'Use CSV or XLSX')
-    data=await upload_bytes(file); id=str(uuid4()); path=ROOT/'raw'/id/('source'+suffix); path.parent.mkdir(parents=True); path.write_bytes(data)
+    data=await upload_bytes(file)
+    if suffix=='.xlsx':
+        from zipfile import ZipFile, BadZipFile
+        import io
+        try:
+            with ZipFile(io.BytesIO(data)) as archive:
+                if sum(info.file_size for info in archive.infolist())>100*1024*1024:
+                    raise HTTPException(422,'XLSX decompressed size exceeds 100 MiB')
+        except BadZipFile as e: raise HTTPException(422,'Invalid XLSX archive') from e
+    id=str(uuid4()); path=ROOT/'raw'/id/('source'+suffix); path.parent.mkdir(parents=True); path.write_bytes(data)
     try: frame=tabular.read_table(path); profile=tabular.profile(frame)
-    except (ValueError,UnicodeError,KeyError) as e: path.unlink(); raise HTTPException(422,str(e)) from e
+    except (ValueError,UnicodeError,KeyError,OSError) as e: path.unlink(); raise HTTPException(422,str(e)) from e
     with Session() as s:
         row=Dataset(id=id,name=Path(file.filename or 'dataset').name[:200],modality=modality,source=source,license=license,sha256=hashlib.sha256(data).hexdigest(),path=str(path),profile=profile); s.add(row); s.commit()
     audit('dataset_import',id); return serialize(row)
@@ -106,7 +132,7 @@ class Operation(BaseModel):
     parameters:dict=Field(default_factory=dict)
 
 @app.post('/analyze/{kind}')
-def analyze(kind:Literal['preprocess','forecast','research','reduce','text','overview'],body:Operation,_:Protected):
+def analyze(kind:Literal['preprocess','forecast','research','reduce','text','overview'],body:Operation,_:Protected,background:bool=False):
     dataset=get_dataset(body.dataset_id); df=tabular.read_table(Path(dataset.path)); p=body.parameters
     allowed={'preprocess':{'ehr','tabular','weight'},'forecast':{'demand'},'research':{'weight','tabular'},'reduce':{'ehr','weight','tabular'},'text':{'clinical_text'},'overview':{'ehr','demand','weight','tabular','clinical_text'}}
     if dataset.modality not in allowed[kind]: raise HTTPException(422,f'{kind} is incompatible with {dataset.modality}')
@@ -117,8 +143,21 @@ def analyze(kind:Literal['preprocess','forecast','research','reduce','text','ove
         if kind=='research': return analytics.research(df,p)
         if kind=='reduce': return analytics.reduce(df,p)
         if kind=='text': return text.analyze(df,p)
-        return tabular.profile(df)
-    return execute(kind,p,work,dataset.id)
+        return analytics.strategic(df,p)
+    if not background: return execute(kind,p,work,dataset.id)
+    if not queue_slots.acquire(blocking=False): raise HTTPException(429,'Research queue is full; wait for an existing job')
+    id=str(uuid4())
+    try:
+        with Session() as session:
+            session.add(Run(id=id,kind=kind,dataset_id=dataset.id,parameters=p,status='pending',result={})); session.commit()
+        def worker():
+            try: execute(kind,p,work,dataset.id,run_id=id)
+            except HTTPException: pass  # Failure is persisted by execute; polling returns the actual error.
+            finally: queue_slots.release()
+        executor.submit(worker)
+    except Exception:
+        queue_slots.release(); raise
+    return {'id':id,'status':'pending'}
 
 @app.post('/images/process')
 async def process_image(_:Protected,file:UploadFile=File(...),method:str=Form(...),parameters:str=Form('{}'),mask:UploadFile|None=File(None)):
@@ -145,14 +184,19 @@ async def registration(_:Protected,first:UploadFile=File(...),second:UploadFile=
     return execute('registration',{},lambda id:images.register(a,b))
 
 @app.post('/inference')
-async def inference(_:Protected,file:UploadFile=File(...)):
+async def inference(_:Protected,file:UploadFile=File(...),explain:bool=Form(False)):
     model=os.getenv('DERMA_MODEL_DIR')
     if not model: raise HTTPException(409,'No trained lesion model configured. Supply validated dataset, train and set DERMA_MODEL_DIR.')
     try: rgb=images.decode(await upload_bytes(file))
     except ValueError as e: raise HTTPException(422,str(e)) from e
-    from .services.ml import predict
+    from .services.ml import predict,gradcam
     # Inference image and scores are not persisted; explicit retention workflow is not yet supported.
-    audit('inference_requested','ephemeral'); return predict(rgb,Path(model))
+    audit('inference_requested','ephemeral')
+    try:
+        result=predict(rgb,Path(model))
+        if explain: result['explanation']=gradcam(rgb,Path(model))
+        return result
+    except (OSError,ValueError,KeyError,RuntimeError) as e: raise HTTPException(409,'Model artifact cannot be used: '+str(e)) from e
 
 @app.get('/runs')
 def runs(_:Protected):
@@ -162,7 +206,13 @@ def runs(_:Protected):
 def run(id:str,_:Protected):
     with Session() as s: item=s.get(Run,id)
     if item is None: raise HTTPException(404,'Run not found')
-    audit('run_read',id); return serialize(item)
+    audit('run_read',id)
+    payload=serialize(item)
+    if item.status=='completed' and item.result.get('artifact')=='report.json':
+        path=ROOT/'processed'/item.id/'report.json'
+        if not path.is_file(): raise HTTPException(409,'Execution artifact is missing from storage')
+        payload['result']=json.loads(path.read_text())
+    return payload
 
 @app.get('/runs/{id}/export/{format}')
 def export(id:str,format:Literal['json','csv'],_:Protected):
@@ -171,3 +221,10 @@ def export(id:str,format:Literal['json','csv'],_:Protected):
     path=ROOT/'processed'/item.id/('report.json' if format=='json' else 'transformed.csv')
     if not path.is_file(): raise HTTPException(404,'Requested artifact is unavailable for this run')
     audit('artifact_export',id); return FileResponse(path,filename=f'{item.kind}-{id}.{format}')
+
+@app.get('/models/current')
+def current_model(_:Protected):
+    if not model_ready(): raise HTTPException(409,'No usable trained model artifact configured')
+    root=Path(os.environ['DERMA_MODEL_DIR'])
+    audit('model_review','current')
+    return {'manifest':json.loads((root/'manifest.json').read_text()),'history':json.loads((root/'history.json').read_text())}

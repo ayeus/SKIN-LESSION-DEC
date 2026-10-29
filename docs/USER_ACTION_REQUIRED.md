@@ -12,3 +12,9 @@ No dataset-dependent tutorial is complete. Provide only authorized, de-identifie
 - [ ] **P1 Before shared deployment:** Supply host/TLS domain and identity provider/security requirements. Current token access is local single-owner research access; production RBAC, encryption at rest and institutional privacy review remain required before identifiable data.
 - [ ] **P1 Mandatory for clinical claims:** Arrange clinician review, external validation and skin-tone/generalization assessment. No output may be used as a confirmed diagnosis.
 - [ ] **P2 Optional terminology:** Confirm whether course 'HER' means EHR; current interpretation is provisional.
+
+## Environment verification actions
+- [ ] **P1 For PostgreSQL container verification:** Start Docker Desktop's engine and confirm `docker info` succeeds. CLI is installed but daemon connection fails. Compose/PostgreSQL execution remains NOT VERIFIED; SQLite workflows are verified.
+- [ ] **P1 For browser/screenshot verification:** Enable Computer Use permissions for this session through the application/OS controls if you want automated UI inspection. Browser tool returned “Computer Use permissions are not granted”; build/component/HTTP checks do not replace viewport screenshots.
+
+Dataset choices have been asked through queued follow-ups. No dataset download/license acceptance proceeds while those choices are pending.

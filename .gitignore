@@ -10,3 +10,5 @@ artifacts/
 .DS_Store
 coverage/
 test-results/
+
+*.tsbuildinfo

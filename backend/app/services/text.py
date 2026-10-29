@@ -20,7 +20,7 @@ def documents(df,p):
 
 def analyze(df,p):
     docs=documents(df,p); task=p.get('task','cluster')
-    if task=='classify':
+    if task in ('classify','disambiguate'):
         label=p.get('label_column','label')
         if label not in df or df[label].isna().any(): raise ValueError('Genuine nonmissing labels are required')
         y=df[label].astype(str)
@@ -34,7 +34,14 @@ def analyze(df,p):
         if set(y.iloc[train])!=set(y): raise ValueError('Training split lacks a class; provide more independent groups')
         model=make_pipeline(TfidfVectorizer(max_features=10000,ngram_range=(1,2)),LogisticRegression(max_iter=1000,random_state=42))
         model.fit([docs[i] for i in train],y.iloc[train]); pred=model.predict([docs[i] for i in test])
-        return {'method':'TF-IDF + logistic regression','evaluation':classification_report(y.iloc[test],pred,output_dict=True,zero_division=0),
+        contextual={}
+        if task=='disambiguate':
+            query=p.get('query','').strip()
+            if not query: raise ValueError('Provide the ambiguous term within its actual clinical context as query')
+            probabilities=model.predict_proba([query])[0]
+            contextual={'sense_candidates':sorted([{'sense':str(label),'uncalibrated_score':float(score)} for label,score in zip(model[-1].classes_,probabilities)],key=lambda v:-v['uncalibrated_score']),
+                'resolution':'Research ranking only; no certainty threshold is validated. Human review required.'}
+        return {**contextual,'method':'TF-IDF + logistic regression','evaluation':classification_report(y.iloc[test],pred,output_dict=True,zero_division=0),
             'test_indices':test.tolist(),'predicted_labels':pred.tolist(),'train_rows':len(train),
             'limitation':'Held-out research baseline. Without patient grouping repeated-note leakage cannot be excluded.'}
     vectorizer=TfidfVectorizer(max_features=10000,ngram_range=(1,2)); x=vectorizer.fit_transform(docs)
@@ -66,5 +73,31 @@ def analyze(df,p):
         ranking=[{'document_index':int(i),'score':float(scores[i]),'text':docs[i]} for i in np.argsort(-scores)[:20] if scores[i]>0]
         return {'method':algorithm,'results':ranking,'explanation':'Scores indicate lexical relevance, not clinical truth. BM25 uses k1=1.5, b=0.75.',
             'disambiguation':{'status':'unresolved','reason':'No context-labeled terminology model supplied. Ambiguous abbreviations remain unresolved.'}}
-    if task=='ner': raise ValueError('BLOCKED: supply a licensed clinical NER model and model card; generic English NER is not medical validation')
+    if task=='ner': return clinical_entities(docs)
     raise ValueError('Unsupported text task')
+
+
+def clinical_entities(docs):
+    """Owner-provided local clinical model; model card and license required."""
+    import os
+    import json
+    from pathlib import Path
+    path=os.getenv('DERMA_NER_MODEL')
+    if not path: raise ValueError('BLOCKED: supply a licensed clinical NER model and model card')
+    root=Path(path)
+    card=root/'research-model-card.json'
+    if not card.is_file(): raise ValueError('Clinical model requires research-model-card.json')
+    metadata=json.loads(card.read_text())
+    if not all(metadata.get(k) for k in ('source','license','intended_use','limitations')): raise ValueError('Model card requires source, license, intended_use and limitations')
+    import spacy
+    nlp=spacy.load(root)
+    if 'ner' not in nlp.pipe_names: raise ValueError('Configured pipeline has no NER component')
+    results=[]
+    for doc in nlp.pipe(docs,batch_size=16):
+        entities=[]
+        for ent in doc.ents:
+            negation=getattr(ent._,'negex',None) if ent.has_extension('negex') else None
+            entities.append({'text':ent.text,'start':ent.start_char,'end':ent.end_char,'label':ent.label_,
+                'negated':negation,'uncertainty':'Not resolved unless validated by the supplied pipeline'})
+        results.append({'text':doc.text,'entities':entities})
+    return {'documents':results,'model_card':metadata,'limitation':'Entity recognition does not verify clinical facts. Negation is unknown unless provided by the configured model; no medical validation is inferred.'}

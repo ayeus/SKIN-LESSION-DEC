@@ -19,3 +19,25 @@ def test_tensor_preprocessing_and_eval_determinism():
     assert x.shape==(1,3,224,224)
     with torch.no_grad(): a=m(x); b=m(x)
     assert a.shape==(1,3); torch.testing.assert_close(a,b,rtol=0,atol=0)
+
+def test_actual_training_checkpoint_roundtrip_and_gradcam(tmp_path):
+    """Explicitly synthetic artifact test; never used in app data or medical claims."""
+    from backend.app.services.ml import train,load_artifact,predict,gradcam
+    import json
+    images=tmp_path/'images'; images.mkdir(); rows=[]
+    for label in ('a','b'):
+        for g in range(10):
+            rgb=np.random.default_rng(g+(100 if label=='b' else 0)).integers(0,256,(32,32,3),dtype=np.uint8)
+            name=f'{label}-{g}.png'; Image.fromarray(rgb).save(images/name)
+            rows.append({'image_path':name,'label':label,'group_id':f'{label}-{g}'})
+    metadata=tmp_path/'metadata.csv'; pd.DataFrame(rows).to_csv(metadata,index=False)
+    output=tmp_path/'synthetic-artifact'; manifest=train(metadata,images,output,epochs=1,batch_size=4)
+    assert (output/'weights.pt').is_file() and (output/'manifest.json').is_file()
+    assert manifest['evaluation']['confusion_matrix'] and manifest['calibrated'] is False
+    model,loaded=load_artifact(output); rgb=np.full((32,32,3),128,np.uint8)
+    a=predict(rgb,output); b=predict(rgb,output); assert a==b
+    assert sum(a['scores'].values())==pytest.approx(1,abs=1e-6)
+    explanation=gradcam(rgb,output); assert explanation['overlay'].startswith('data:image/png;base64,')
+    assert explanation['activation_peak']>=0
+    with (output/'weights.pt').open('ab') as stream: stream.write(b'corrupted')
+    with pytest.raises(ValueError,match='checksum'): load_artifact(output)

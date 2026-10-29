@@ -24,7 +24,7 @@ def profile(df):
     numeric = df.select_dtypes(include='number')
     return clean_json({'rows':len(df),'columns':[{'name':c,'dtype':str(df[c].dtype),'missing':int(df[c].isna().sum()),'unique':int(df[c].nunique())} for c in df],
         'exact_duplicate_rows':int(df.duplicated().sum()),'preview':df.head(20).where(pd.notna(df),None).to_dict('records'),
-        'statistics':numeric.describe().to_dict() if len(numeric.columns) else {},'correlation':numeric.corr().to_dict() if len(numeric.columns) else {}})
+        'histograms':{c:{'counts':np.histogram(numeric[c].dropna().to_numpy(),bins=20)[0].tolist(),'edges':np.histogram(numeric[c].dropna().to_numpy(),bins=20)[1].tolist()} for c in numeric if len(numeric[c].dropna()) and np.isfinite(numeric[c].dropna()).all()},'statistics':numeric.describe().to_dict() if len(numeric.columns) else {},'correlation':numeric.corr().to_dict() if len(numeric.columns) else {}})
 
 def transform(df, p):
     out=df.copy(deep=True); log=[]; review=[]
@@ -64,6 +64,20 @@ def transform(df, p):
     if keys:
         for c in keys: require(c)
         review.append({'reason':'potential_repeated_keys_not_removed','rows':np.flatnonzero(out.duplicated(subset=keys,keep=False)).tolist()})
+    near=p.get('near_duplicate_columns',[])
+    if near:
+        from difflib import SequenceMatcher
+        if len(near)<2: raise ValueError('Near-duplicate review needs at least two fields, never patient identity alone')
+        for c in near: require(c)
+        if len(out)>1000: raise ValueError('Pairwise near-duplicate review limited to 1000 rows')
+        threshold=float(p.get('near_duplicate_similarity',0))
+        if not 0<threshold<=1: raise ValueError('Supply explicit near_duplicate_similarity in (0,1]')
+        rows=out[near].fillna('').astype(str).agg(' | '.join,axis=1).str.lower().tolist(); pairs=[]
+        for i in range(len(rows)):
+            for j in range(i+1,len(rows)):
+                similarity=SequenceMatcher(None,rows[i],rows[j],autojunk=False).ratio()
+                if similarity>=threshold: pairs.append({'row_a':i,'row_b':j,'similarity':similarity})
+        review.append({'reason':'near_duplicate_candidates_not_removed','columns':near,'threshold':threshold,'pairs':pairs})
     for c,strategy in p.get('impute',{}).items():
         require(c); missing=int(out[c].isna().sum())
         if strategy in ('median','mean'):

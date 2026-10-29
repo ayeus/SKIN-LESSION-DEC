@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from PIL import Image, ImageOps
 from sklearn.model_selection import StratifiedGroupKFold
-from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, roc_auc_score, log_loss
+from sklearn.metrics import classification_report, confusion_matrix, balanced_accuracy_score, roc_auc_score, log_loss, roc_curve, precision_recall_curve
 
 SIZE=224
 MEAN=[.485,.456,.406]; STD=[.229,.224,.225]
@@ -84,16 +84,33 @@ def train(metadata,images,output,name='small_cnn',epochs=5,batch_size=16,seed=42
         if totals[1]['loss']<best:
             best=totals[1]['loss']; torch.save(model.state_dict(),output/'weights.pt')
         (output/'history.json').write_text(json.dumps(history,indent=2))
-    model.load_state_dict(torch.load(output/'weights.pt',weights_only=True)); model.eval(); truth=[]; scores=[]
+    model.load_state_dict(torch.load(output/'weights.pt',weights_only=True)); model.eval(); truth=[]; scores=[]; embeddings=[]
+    head=model.fc if name=='resnet18' else model.classifier[1] if name=='efficientnet_b0' else model[-1]
+    handle=head.register_forward_pre_hook(lambda module,args:embeddings.extend(args[0].detach().cpu().tolist()))
     with torch.no_grad():
         for x,y in loaders[2]: truth+=y.tolist(); scores+=model(x).softmax(1).tolist()
-    scores=np.asarray(scores); pred=scores.argmax(1)
+    handle.remove()
+    features=pd.DataFrame(embeddings,columns=[f'feature_{i}' for i in range(len(embeddings[0]))]); features['label']=[labels[i] for i in truth]; features['group_id']=df.iloc[test_ix].group_id.to_numpy(); features.to_csv(output/'test_embeddings.csv',index=False)
+    scores=np.asarray(scores,dtype=np.float64); scores/=scores.sum(axis=1,keepdims=True); pred=scores.argmax(1)
     evaluation={'classification':classification_report(truth,pred,labels=list(range(len(labels))),target_names=labels,output_dict=True,zero_division=0),
         'balanced_accuracy':balanced_accuracy_score(truth,pred),'confusion_matrix':confusion_matrix(truth,pred,labels=list(range(len(labels)))).tolist(),
         'log_loss':log_loss(truth,scores,labels=list(range(len(labels)))),'brier_multiclass':float(np.mean(np.sum((scores-np.eye(len(labels))[truth])**2,axis=1))),
         'roc_auc':roc_auc_score(truth,scores[:,1]) if len(labels)==2 else roc_auc_score(truth,scores,multi_class='ovr',labels=list(range(len(labels))))}
+    # Actual class-wise curves, reliability bins and measured calibration error.
+    curves={}
+    for index,label in enumerate(labels):
+        binary=(np.asarray(truth)==index).astype(int)
+        fpr,tpr,_=roc_curve(binary,scores[:,index]); precision,recall,_=precision_recall_curve(binary,scores[:,index])
+        curves[label]={'fpr':fpr.tolist(),'tpr':tpr.tolist(),'precision':precision.tolist(),'recall':recall.tolist()}
+    reliability=[]; ece=0.; confidence=scores.max(1); correct=pred==np.asarray(truth)
+    for i in range(10):
+        mask=(confidence>=i/10)&(confidence<(i+1)/10 if i<9 else confidence<=1)
+        if mask.any():
+            average=float(confidence[mask].mean()); accuracy=float(correct[mask].mean()); count=int(mask.sum())
+            ece+=count/len(truth)*abs(average-accuracy); reliability.append({'lower':i/10,'upper':(i+1)/10,'count':count,'mean_score':average,'accuracy':accuracy})
+    evaluation.update(curves=curves,reliability=reliability,expected_calibration_error=ece,calibration_note='Measured on held-out test, 10 fixed-width bins; scores remain uncalibrated.')
     manifest={'architecture':name,'labels':labels,'size':SIZE,'mean':MEAN,'std':STD,'seed':seed,'epochs':epochs,'pretrained_imagenet':pretrained,
-        'metadata_sha256':hashlib.sha256(metadata.read_bytes()).hexdigest(),'weights_sha256':hashlib.sha256((output/'weights.pt').read_bytes()).hexdigest(),
+        'image_content_sha256':hashlib.sha256(''.join(sorted(hashes)).encode()).hexdigest(),'metadata_sha256':hashlib.sha256(metadata.read_bytes()).hexdigest(),'weights_sha256':hashlib.sha256((output/'weights.pt').read_bytes()).hexdigest(),
         'split_indices':{'train':train_ix.tolist(),'validation':val_ix.tolist(),'test':test_ix.tolist()},
         'group_semantics':'Owner must document patient vs lesion grouping; lesion IDs do not exclude same-patient leakage.',
         'calibrated':False,'research_only':True,'evaluation':evaluation}
@@ -113,3 +130,25 @@ def predict(rgb,root):
     with torch.no_grad(): scores=model(x).softmax(1)[0].tolist()
     return {'scores':dict(zip(manifest['labels'],scores)),'research_prediction':manifest['labels'][int(np.argmax(scores))],
         'calibrated':False,'model_sha256':manifest['weights_sha256'],'limitation':'Uncalibrated research scores, not diagnostic confidence. External clinical validation has not been established.'}
+
+def gradcam(rgb,root):
+    from .images import uri
+    import cv2
+    model,manifest=load_artifact(root)
+    layer=model.layer4[-1] if manifest['architecture']=='resnet18' else model.features[-1] if manifest['architecture']=='efficientnet_b0' else model[3]
+    activations=[]; gradients=[]
+    def hook(module,args,output):
+        activations.append(output)
+        output.register_hook(lambda gradient:gradients.append(gradient))
+    handle=layer.register_forward_hook(hook)
+    try:
+        x=preprocessing()(Image.fromarray(rgb)).unsqueeze(0).requires_grad_(True)
+        logits=model(x); index=int(logits.argmax(1)); model.zero_grad(); logits[0,index].backward()
+        cam=torch.relu((gradients[0].mean(dim=(2,3),keepdim=True)*activations[0]).sum(dim=1))[0].detach().numpy()
+        cam=cv2.resize(cam,(rgb.shape[1],rgb.shape[0])); peak=float(cam.max())
+        if peak>0: cam/=peak
+        heat=cv2.cvtColor(cv2.applyColorMap(np.uint8(cam*255),cv2.COLORMAP_TURBO),cv2.COLOR_BGR2RGB)
+        overlay=np.uint8(.65*rgb+.35*heat)
+        return {'class':manifest['labels'][index],'overlay':uri(overlay),'activation_peak':peak,
+            'limitation':'Grad-CAM is a coarse gradient-based attribution, not an expert lesion mask or evidence of clinical reasoning.'}
+    finally: handle.remove()

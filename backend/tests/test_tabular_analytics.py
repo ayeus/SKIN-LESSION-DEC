@@ -57,3 +57,22 @@ def test_real_label_requirement_and_training_only_vocabulary():
     df=pd.DataFrame({'text':[f'skin lesion dermoscopy {i}' for i in range(12)]+[f'cardiac rhythm imaging {i}' for i in range(12)],'label':['skin']*12+['cardiac']*12})
     r=analyze(df,{'task':'classify'}); assert r['train_rows']==18; assert r['evaluation']['accuracy']>=.9
     with pytest.raises(ValueError): analyze(df.drop(columns='label'),{'task':'classify'})
+
+def test_near_duplicates_flagged_but_not_removed():
+    df=pd.DataFrame({'encounter':['visit-one','visit-one'],'note':['lesion checked','lesion checkd']})
+    out,report=transform(df,{'near_duplicate_columns':['encounter','note'],'near_duplicate_similarity':.8})
+    assert len(out)==2; assert report['manual_review'][0]['pairs'][0]['similarity']>=.8
+    with pytest.raises(ValueError): transform(df,{'near_duplicate_columns':['encounter'],'near_duplicate_similarity':.8})
+
+def test_strategic_aggregates_use_explicit_count_mapping():
+    from backend.app.services.analytics import strategic
+    df=pd.DataFrame({'date':['2020-01-01','2020-01-02','2020-02-01'],'department':['a','a','b'],'arrivals':[3,5,7]})
+    r=strategic(df,{'date_column':'date','count_column':'arrivals','group_column':'department','end_date':'2020-01-31'})
+    assert r['observed_total']==8 and r['distribution']=={'a':8.0}
+    assert strategic(df,{})['observed_total']==3
+
+def test_contextual_sense_ranking_requires_genuine_labels():
+    df=pd.DataFrame({'text':['physical therapy muscle exercise recovery']*12+['prothrombin time coagulation blood assay']*12,'label':['physical therapy']*12+['prothrombin time']*12})
+    result=analyze(df,{'task':'disambiguate','query':'PT muscle exercise recovery'})
+    assert result['sense_candidates'][0]['sense']=='physical therapy'
+    assert 'Human review' in result['resolution']

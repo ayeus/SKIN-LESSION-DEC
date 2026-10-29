@@ -39,3 +39,17 @@ def test_import_requires_authorization_and_provenance():
     with TestClient(app) as client:
         r=client.post('/datasets',headers=H,data={'modality':'ehr','source':'fixture','license':'test','authorized':'false'},files={'file':('x.csv',b'a\n1')})
         assert r.status_code==422
+
+def test_background_run_reaches_persisted_terminal_state():
+    import time
+    with TestClient(app) as client:
+        data={'modality':'tabular','source':'synthetic job test','license':'test','authorized':'true'}
+        id=client.post('/datasets',headers=H,data=data,files={'file':('synthetic.csv',b'x,z\n1,2\n2,4\n3,6\n4,8')}).json()['id']
+        job=client.post('/analyze/reduce?background=true',headers=H,json={'dataset_id':id,'parameters':{'features':['x','z']}})
+        assert job.status_code==200,job.text
+        for _ in range(100):
+            run=client.get('/runs/'+job.json()['id'],headers=H).json()
+            if run['status'] in ('completed','failed'): break
+            time.sleep(.02)
+        assert run['status']=='completed',run
+        assert len(run['result']['coordinates'])==4

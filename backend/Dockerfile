@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 WORKDIR /app
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY backend/requirements-base.lock /app/backend/requirements-base.lock
+RUN pip install --no-cache-dir --require-hashes -r backend/requirements-base.lock
 COPY backend /app/backend
 COPY scripts /app/scripts
 RUN useradd --create-home researcher && mkdir /app/data && chown researcher /app/data
