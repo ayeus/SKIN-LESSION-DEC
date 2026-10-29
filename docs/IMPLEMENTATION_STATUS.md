@@ -16,13 +16,13 @@
 - CSV/XLSX and strict de-identified FHIR R4 collection subset; linked Patient/Encounter/Observation/Condition validation. Unsupported/identifying fields rejected before raw persistence. Not full FHIR conformance.
 - Reproducible tabular cleaning, quality/missingness, exact deduplication, near-duplicate review, explicit conversions and imputation. Read-only paginated/filterable dataset explorer and explicit many-to-one EHR relationship inspection; repeated encounters preserved.
 - Genuine-label TF-IDF classifier, clustering, BM25/TF-IDF retrieval and contextual sense ranking; licensed local clinical NER adapter.
-- Daily demand baselines and autoregressive ridge, separate chronological selection/test, dimensioned staff-shifts/day and explicit per-shift capacity scenarios, historical indicators, PCA/t-SNE and observational modeling/diagnostics/sensitivity.
+- Daily demand baselines and autoregressive ridge, separate chronological selection/test, dimensioned staff-shifts/day and explicit per-shift capacity scenarios, historical indicators, PCA/t-SNE and observational modeling/diagnostics/sensitivity. Interactive 2D/rotatable 3D actual-coordinate viewing, variance table, input-row inspection and disclosed bounded display. Constant-feature matrices rejected instead of emitting undefined variance. Real 5,569-adult NHANES 3D PCA and t-SNE runs persisted.
 - Integrated Next.js workspace, result charts, report inspection/export, honest missing-input states.
 
 ## Current verification
-- **74 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
-- **26 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. The complete Compose stack also passed isolated build/migration/HTTP/account/image-processing/export/runtime-gate checks; disposable resources removed.
-- **15 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
+- **78 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
+- **27 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. The complete Compose stack also passed isolated build/migration/HTTP/account/image-processing/export/runtime-gate checks; disposable resources removed.
+- **18 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
 - Native Chrome navigation available, but application web content absent from accessibility tree and screenshot returned black. Browser flow/visual/viewport verification remains NOT VERIFIED; HTTP/component/build checks do not substitute.
 
 ## Remaining implementation and validation

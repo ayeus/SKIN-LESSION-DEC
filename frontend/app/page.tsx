@@ -1,5 +1,6 @@
 "use client";
 import TrainingPanel from "./components/training-panel";
+import EmbeddingView from "./components/embedding-view";
 import ForecastEvidence from "./components/forecast-evidence";
 import AccountLogin from "./components/account-login";
 import AccountPanel from "./components/account-panel";
@@ -37,8 +38,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  ScatterChart as Plot,
-  Scatter,
 } from "recharts";
 type Result = Record<string, any>;
 type Dataset = {
@@ -308,23 +307,11 @@ function Results({
         );
       })}
       {r.coordinates && (
-        <div className="chart">
-          <ResponsiveContainer width="100%" height={300}>
-            <Plot>
-              <CartesianGrid />
-              <XAxis type="number" dataKey="x" />
-              <YAxis type="number" dataKey="y" />
-              <Tooltip />
-              <Scatter
-                data={r.coordinates.map((v: number[]) => ({
-                  x: v[0],
-                  y: v[1],
-                }))}
-                fill="#087f83"
-              />
-            </Plot>
-          </ResponsiveContainer>
-        </div>
+        <EmbeddingView
+          coordinates={r.coordinates}
+          method={r.method || "embedding"}
+          variance={r.explained_variance_ratio}
+        />
       )}
       {r.predicted && (
         <Chart
@@ -557,8 +544,10 @@ export default function Home() {
             .split(",")
             .map((v) => v.trim())
             .filter(Boolean);
-          if (type === "reduce") p.method = fd.get("reduction");
-          else p.target = fd.get("target");
+          if (type === "reduce") {
+            p.method = fd.get("reduction");
+            p.dimensions = Number(fd.get("dimensions"));
+          } else p.target = fd.get("target");
         }
         output = await api(
           "/analyze/" +
@@ -1382,13 +1371,25 @@ export default function Home() {
                             <input name="features" required />
                           </label>
                           {page === "reduce" ? (
-                            <label>
-                              Method
-                              <select name="reduction">
-                                <option value="pca">PCA</option>
-                                <option value="tsne">t-SNE</option>
-                              </select>
-                            </label>
+                            <>
+                              <label>
+                                Method
+                                <select name="reduction">
+                                  <option value="pca">PCA</option>
+                                  <option value="tsne">t-SNE</option>
+                                </select>
+                              </label>
+                              <label>
+                                Dimensions
+                                <select
+                                  name="dimensions"
+                                  aria-label="Embedding dimensions"
+                                >
+                                  <option value="2">2D</option>
+                                  <option value="3">3D</option>
+                                </select>
+                              </label>
+                            </>
                           ) : (
                             <label>
                               Observed numeric outcome

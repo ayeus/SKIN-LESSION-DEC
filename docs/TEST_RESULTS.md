@@ -72,3 +72,10 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - `.venv/bin/python -m scripts.check_postgres`: **26 passed**, 5.67s, disposable migrated PostgreSQL removed (recorded before final display-label changes).
 - `cd frontend && npm run typecheck && npm run test && npm run build`: **15 component tests passed**, 2.03s; typecheck and optimized build passed after final count-unit labels. Tests distinguish recorded independent test metrics from older validation-only reports and prevent daily workload from appearing as inferred per-shift staffing.
 - Browser screenshot/responsive/interaction QA remains NOT VERIFIED. No clinical performance claim follows from these software checks.
+
+## Interactive 3D exploratory geometry milestone — 2026-10-29
+- `.venv/bin/python -m scripts.verify_public_reduction`: real 5,569-adult NHANES PCA and t-SNE executed, complete 3D coordinates and provenance persisted. Actual component variances and optimization objective recorded in DATA_ACQUISITION.md; no clinical validity inferred.
+- `.venv/bin/python -m pytest backend/tests -q`: **78 passed**, 5.68s, one visible upstream deprecation warning. New mathematical tests cover three-component PCA rank/row order, rejection of constant matrices and fractional dimensions; API test checks real coordinates, persistence/provenance and exact exported coordinates. Initial API test assumed a run envelope around the JSON download; corrected to the documented raw-result export contract, retaining exact coordinate equality.
+- `.venv/bin/python -m scripts.check_postgres`: **27 passed**, 5.64s after the same test-contract correction; disposable container removed.
+- `cd frontend && npm run typecheck`, followed by `npm run test && npm run build`: passed; **18 component tests**, 2.16s; optimized build passed. Mathematical rotation tests preserve norms/use the actual third coordinate; component tests exercise rotation, row inspection, invalid-input rejection and disclosed bounded display.
+- Full native-browser visual/viewport QA remains NOT VERIFIED.

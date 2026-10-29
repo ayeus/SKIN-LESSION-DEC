@@ -167,3 +167,43 @@ def test_analysis_report_keeps_source_provenance_and_scope():
         assert len(result["dataset_provenance"]["sha256"]) == 64
         assert "path" not in result["dataset_provenance"]
         assert result["data_scope"]["limitations"] == "Isolated source scope fixture"
+
+
+def test_three_dimensional_analysis_persists_actual_coordinates_and_source():
+    """Isolated numeric geometry fixture; never a clinical dataset."""
+    with TestClient(app) as client:
+        imported = client.post(
+            "/datasets",
+            headers=H,
+            data={
+                "modality": "weight",
+                "source": "synthetic geometric test",
+                "license": "test-only",
+                "authorized": "true",
+            },
+            files={
+                "file": (
+                    "geometry.csv",
+                    b"a,b,c\n0,0,0\n1,2,-1\n2,4,-2\n3,6,-3\n4,8,-4\n",
+                    "text/csv",
+                )
+            },
+        )
+        assert imported.status_code == 200, imported.text
+        dataset_id = imported.json()["id"]
+        response = client.post(
+            "/analyze/reduce",
+            headers=H,
+            json={
+                "dataset_id": dataset_id,
+                "parameters": {"features": ["a", "b", "c"], "dimensions": 3},
+            },
+        )
+        assert response.status_code == 200, response.text
+        run = response.json()
+        coordinates = np.asarray(run["result"]["coordinates"])
+        assert coordinates.shape == (5, 3) and np.isfinite(coordinates).all()
+        assert run["result"]["dataset_provenance"]["id"] == dataset_id
+        exported = client.get(f"/runs/{run['id']}/export/json", headers=H)
+        assert exported.status_code == 200
+        assert exported.json()["coordinates"] == run["result"]["coordinates"]

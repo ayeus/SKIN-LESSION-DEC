@@ -33,13 +33,20 @@ def reduce(df, p):
     x = numeric_matrix(df, p.get("features", []))
     if len(x) < 4:
         raise ValueError("At least four observations required")
-    dims = int(p.get("dimensions", 2))
+    raw_dims = float(p.get("dimensions", 2))
+    if not np.isfinite(raw_dims) or not raw_dims.is_integer():
+        raise ValueError("Dimensions must be a whole number, 2 or 3")
+    dims = int(raw_dims)
     method = p.get("method", "pca")
     if dims not in (2, 3) or dims > min(x.shape):
         raise ValueError("Dimensions must be 2 or 3 and fit the matrix shape")
     scaled = make_pipeline(
         SimpleImputer(strategy="median"), StandardScaler()
     ).fit_transform(x)
+    if not np.any(np.var(scaled, axis=0) > 0):
+        raise ValueError(
+            "No varying features after imputation; embedding and explained variance are undefined"
+        )
     if method == "pca":
         model = PCA(n_components=dims)
         embedding = model.fit_transform(scaled)
@@ -53,20 +60,35 @@ def reduce(df, p):
             raise ValueError(
                 "Perplexity must be positive and smaller than sample count"
             )
-        embedding = TSNE(
+        model = TSNE(
             n_components=dims,
             perplexity=perplexity,
             random_state=42,
             init="pca",
             learning_rate="auto",
-        ).fit_transform(scaled)
-        extra = {}
+            max_iter=1000,
+        )
+        embedding = model.fit_transform(scaled)
+        extra = {
+            "perplexity": perplexity,
+            "seed": 42,
+            "kl_divergence": float(model.kl_divergence_),
+            "iterations": int(model.n_iter_),
+            "max_iterations": 1000,
+        }
     else:
         raise ValueError("Supported methods: pca, tsne. UMAP is not installed.")
     return {
         "method": method,
         "coordinates": embedding.tolist(),
         "features": list(x.columns),
+        "dimensions": dims,
+        "rows": len(x),
+        "row_order": "Coordinates preserve input row order; no patient identity is inferred.",
+        "preprocessing": {
+            "imputation": "feature median",
+            "scaling": "zero mean and unit variance",
+        },
         **extra,
         "limitation": "Exploratory geometry does not establish clinical validity. Imputation/scaling are fitted on this exploratory dataset.",
     }

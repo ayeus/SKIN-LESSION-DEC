@@ -25,6 +25,9 @@ Real exploratory BMI regression executed using age, reported binary sex code, se
 
 Rejected UCI Obesity Levels as primary real-observation case study: its official description says 77% of rows are synthetic (https://archive.ics.uci.edu/dataset/544/estimation+of+obesity+levels+based+on+eating+habits+and+physical+condition). No hidden synthetic alternative was used.
 
+## Actual dimensionality-reduction study
+Executed both three-component PCA and t-SNE on all 5,569 selected NHANES adult rows, using age, source sex code, sedentary minutes, exact weekday sleep and exact meals-away fields. Participant ID, survey design fields and BMI were excluded from embedding predictors. Median imputation and standardization fitted on this exploratory dataset; no labels inferred. PCA run `444dc994-35bf-48a8-87d6-587c599dd781` measured component variance ratios 0.25671173, 0.21109395, 0.20091706. t-SNE run `068225c1-6871-4eb6-b319-f3c0b7bcdbdb` used perplexity 30, seed 42 and maximum 1,000 iterations; recorded optimization KL=1.17222190. That value is not clinical performance or evidence of meaningful disease clusters. Full coordinates persist locally in run reports; summary in `data/processed/public/nhanes/reduction-verification.json`. Unweighted, modality-specific descriptive geometry only; missingness/imputation affect neighborhoods.
+
 ## Historical public demand case study
 Official UKHSA API, [access documentation](https://ukhsa-dashboard.data.gov.uk/access-our-data/getting-started), [metric definition](https://ukhsa-dashboard.data.gov.uk/metrics-documentation/covid-19-healthcare-admission-by-day) and [source dashboard](https://ukhsa-dashboard.data.gov.uk/respiratory-viruses/covid-19). Open Government Licence v3.0, with UKHSA/NHS England attribution and no endorsement. Metric `COVID-19_healthcare_admissionByDay`, Nation=England, age/sex=all, stratum=default. This is national COVID admissions, not all ED arrivals, dermatology demand, local hospital operations or staffing history. Publisher definitions, testing and reporting changes limit comparability.
 
@@ -40,6 +43,7 @@ Clinical notes/gold labels/NER annotations remain unavailable. Institution-speci
 - `.venv/bin/python -m alembic -c backend/alembic.ini upgrade head`
 - `.venv/bin/python -m scripts.verify_public_ehr`
 - `.venv/bin/python -m scripts.verify_public_weight`
+- `.venv/bin/python -m scripts.verify_public_reduction` (requires registered NHANES derivative; real 3D PCA/t-SNE)
 - `.venv/bin/python -m scripts.acquire_public_demand` (official API; cached raw SHA verification; real forecasting and retrospective checks)
 - `.venv/bin/python -m scripts.prepare_isic` validates labels/groups and safely extracts only matching image basenames once archive exists.
 
