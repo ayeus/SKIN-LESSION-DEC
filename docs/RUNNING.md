@@ -68,7 +68,7 @@ Component tests use isolated synthetic HTTP fixtures; they are not browser end-t
 
 ## Containers
 
-Set nonempty POSTGRES_PASSWORD and DERMA_API_TOKEN in `.env`. Use a URI-safe password or supply appropriately escaped connection configuration. Then `docker compose up --build`. DB readiness → migrations → API → web. Ports bind loopback. Base API image excludes optional ML/NLP libraries; use full-lock installation/build extension before enabling these modules. Docker daemon unavailable during initial verification, so container execution is not claimed tested.
+Set nonempty POSTGRES_PASSWORD and DERMA_API_TOKEN in `.env`. Use a URI-safe password or supply appropriately escaped connection configuration. Then `docker compose up --build`. DB readiness → migrations → API → web. Ports bind loopback. Base API image excludes optional ML/NLP libraries; use full-lock installation/build extension before enabling these modules. The complete base Compose stack was built and exercised in an isolated project; migrations, authentication/account persistence, frontend proxy, real image processing/export and missing-ML-runtime gates passed. This does not verify optional CNN training inside the base image.
 
 ## Operations and limits
 
@@ -93,3 +93,5 @@ Inference defaults to no score/image retention. Download research prediction rep
 Run migration 002 before starting the updated API. Bootstrap with DERMA_API_TOKEN, then choose real usernames/passwords/roles through Settings. Local account sign-in returns expiring sessions, stored in browser memory only. Lock workspace attempts named-session revocation and clears cached data; environment tokens must be rotated/unset to revoke. Named researchers own newly created datasets/runs; viewers are read-only; legacy public imports remain admin-only until explicitly granted. Training source inspection/submission and global model selection require admin. See [LOCAL_IDENTITY.md](LOCAL_IDENTITY.md) for precise scope and limitations. No real accounts have been seeded.
 
 The status page reports bytes on disk and actual ISIC manifest distribution to administrators. Expected archive size comes from the official HTTP response, not a fabricated progress percentage. The partial file does not prove an active transfer; use the acquisition script to resume after stopping any prior transfer. Complete archive, extraction, content checks and model training are separate states.
+
+Full-stack smoke check: `.venv/bin/python -m scripts.check_compose`. Requires local ports 3000/8000 free. Uses a unique project, generated ephemeral credentials and synthetic isolated fixtures; builds real images and tests HTTP through the Next.js proxy. Finally removes only its own containers/volumes/network. It never binds the working project healthcare-data directory. Optional ML/NLP dependencies report explicit blockers rather than pretending a model is available.

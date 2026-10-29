@@ -180,7 +180,12 @@ def clinical_entities(docs):
         raise ValueError(
             "Model card requires source, license, intended_use and limitations"
         )
-    import spacy
+    try:
+        import spacy
+    except ImportError as error:
+        raise ValueError(
+            "BLOCKED: clinical NER runtime missing; install backend/requirements-nlp.txt"
+        ) from error
 
     nlp = spacy.load(root)
     if "ner" not in nlp.pipe_names:

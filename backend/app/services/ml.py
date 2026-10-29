@@ -66,6 +66,10 @@ def split_metadata(df, seed=42):
 
 
 def architecture(name, classes, pretrained=False):
+    if name == "small_cnn" and pretrained:
+        raise ValueError(
+            "Small CNN has no ImageNet weights; choose ResNet/EfficientNet or disable pretraining"
+        )
     if name == "resnet18":
         model = models.resnet18(
             weights=models.ResNet18_Weights.DEFAULT if pretrained else None

@@ -58,3 +58,10 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - Final frontend typecheck, **12 component tests** (1.80s) and optimized build passed after 401 cache clearing and account/audit UI changes.
 - Formatting-only commit staged 22 existing Python files only after comparing their before/after ASTs and confirming equality. No assertions or algorithms were weakened.
 - Full-stack Docker Compose build/HTTP verification is in progress; no success claimed yet.
+
+## Full-stack Compose and runtime boundaries
+- `.venv/bin/python -m scripts.check_compose`: first base check passed. Expanded check then failed on a SyntaxError in the test-fixture `python -c` newline escaping after image processing/export had passed. Corrected the fixture argv to use explicit byte encoding, compiled it locally, and reran without weakening any assertions.
+- Final expanded Compose check **PASSED**: fresh real builds, PostgreSQL readiness/migrations, authenticated account persistence, frontend root/proxy HTTP, uploaded synthetic pixels → real PNG encoding/SSIM → persisted report → JSON export, missing real-model/data gate, and explicit absent-torch blocker after a temporary synthetic manifest was injected. Fixtures exist only in the disposable project; containers, volumes and network removed in finally.
+- Default base Docker image intentionally excludes optional torch/spaCy. API now reports an explicit CNN/NER runtime dependency blocker instead of an unhandled import failure. Host environment retains full locked ML/NLP dependencies.
+- Code review found small_cnn could record a requested pretrained flag although it has no ImageNet weights. Architecture and API validation now reject this configuration; no real trained artifacts existed to repair.
+- Final `.venv/bin/python -m pytest backend/tests -q`: **60 passed**, 6.21s. `.venv/bin/python -m scripts.check_postgres`: **25 passed**, 5.41s, container removed. Frontend remains **12 passing component tests**, passing typecheck/build; no frontend source changed in this runtime-boundary patch.

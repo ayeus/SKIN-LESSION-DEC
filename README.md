@@ -14,4 +14,4 @@ Real FastAPI/SQLAlchemy services, integrated Next.js UI, local accounts/roles, p
 - [Tutorial coverage matrix](docs/TUTORIAL_COVERAGE.md)
 - [Architecture](docs/ARCHITECTURE.md), [algorithms](docs/ALGORITHMS.md), [academic report and viva](docs/ACADEMIC_REPORT.md)
 
-Python 3.13, Node 20.9+, `npm ci`, hash-locked Python dependencies, Alembic migrations and environment-based configuration. Local SQLite is supported; PostgreSQL Compose configuration awaits Docker engine verification. Do not commit datasets, patient records, model artifacts or `.env` secrets.
+Python 3.13, Node 20.9+, `npm ci`, hash-locked Python dependencies, Alembic migrations and environment-based configuration. Local SQLite is supported; PostgreSQL and the full Docker Compose stack have passed isolated migration/API/frontend-proxy/image-processing checks. Do not commit datasets, patient records, model artifacts or `.env` secrets.

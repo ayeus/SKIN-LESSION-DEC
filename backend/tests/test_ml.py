@@ -85,3 +85,8 @@ def test_actual_training_checkpoint_roundtrip_and_gradcam(tmp_path):
         stream.write(b"corrupted")
     with pytest.raises(ValueError, match="checksum"):
         load_artifact(output)
+
+
+def test_small_baseline_cannot_claim_imagenet_pretraining():
+    with pytest.raises(ValueError, match="no ImageNet weights"):
+        architecture("small_cnn", 2, pretrained=True)

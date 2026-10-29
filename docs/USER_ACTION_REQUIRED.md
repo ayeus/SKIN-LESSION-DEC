@@ -14,7 +14,7 @@ Public EHR and adult behavioral datasets have now been acquired and exercised; n
 - [ ] **P2 Optional terminology:** Confirm whether course 'HER' means EHR; current interpretation is provisional.
 
 ## Environment verification actions
-- [x] **PostgreSQL integration verified:** Docker engine is now available. Disposable PostgreSQL migrations/API/FHIR/training/relationship tests passed. Full Compose deployment remains a separate unverified check.
+- [x] **PostgreSQL integration verified:** Docker engine is now available. Disposable PostgreSQL migrations/API/FHIR/training/relationship tests passed. The complete base Compose stack has also passed isolated migration/authentication/proxy/image-processing/export checks. Optional CNN-container training and clinical validation remain separate.
 - [ ] **P1 For browser/screenshot verification:** Enable Computer Use permissions for this session through the application/OS controls if you want automated UI inspection. Native browser navigation is now available, but screenshots are black and the application content is absent from the accessibility tree. Visual/browser workflows remain unverified; build/component/HTTP checks do not replace them.
 
 Owner authorized suitable public sources on 2026-10-29 and has no existing approved datasets. Public-source acquisition proceeded; restricted datasets and account agreements remain owner actions. No dataset approval is inferred for identifiable or restricted records.

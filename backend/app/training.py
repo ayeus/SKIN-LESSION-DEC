@@ -18,9 +18,10 @@ def readiness():
     if not metadata.is_file():
         return {"ready": False, "reason": "Labeled image metadata is not available"}
     import pandas as pd
-    from .services.ml import split_metadata
 
     try:
+        from .services.ml import split_metadata
+
         frame = pd.read_csv(metadata, dtype={"label": str, "group_id": str})
         split_metadata(frame)
         missing = 0
@@ -38,6 +39,11 @@ def readiness():
             if not missing
             else "Image download/extraction is incomplete",
             "grouping_limit": "Group IDs must represent patients where available. Lesion-only groups cannot rule out same-patient leakage.",
+        }
+    except ImportError:
+        return {
+            "ready": False,
+            "reason": "CNN runtime is unavailable; install backend/requirements-ml.txt or use the full locked environment",
         }
     except (ValueError, KeyError, OSError) as error:
         return {"ready": False, "reason": str(error)}

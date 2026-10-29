@@ -20,6 +20,14 @@ def test_missing_dataset_blocks_and_does_not_promote(monkeypatch, tmp_path):
         assert (
             client.post("/training", headers=H, json={"epochs": 0}).status_code == 422
         )
+        assert (
+            client.post(
+                "/training",
+                headers=H,
+                json={"architecture": "small_cnn", "pretrained": True},
+            ).status_code
+            == 422
+        )
         assert client.post("/models/select/not-present", headers=H).status_code == 404
 
 
@@ -156,3 +164,25 @@ def test_acquisition_state_measures_partial_bytes_without_claiming_readiness(
     state = training.acquisition_state()
     assert state["state"] == "partial_archive" and state["bytes_on_disk"] == 16
     assert state["fraction_on_disk"] == 0.16 and "liveness" in state["note"]
+
+
+def test_readiness_reports_missing_optional_ml_runtime(monkeypatch, tmp_path):
+    import builtins
+    from backend.app import training
+
+    path = tmp_path / "metadata.csv"
+    path.write_text("image_path,label,group_id\na.png,a,a\n")
+    monkeypatch.setenv("DERMA_LESION_METADATA", str(path))
+    original = builtins.__import__
+
+    def guarded(name, *args, **kwargs):
+        if (
+            name == "services.ml"
+            and kwargs.get("level", args[3] if len(args) > 3 else 0) == 1
+        ):
+            raise ModuleNotFoundError("isolated missing-ML-runtime fixture")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded)
+    result = training.readiness()
+    assert result["ready"] is False and "CNN runtime" in result["reason"]

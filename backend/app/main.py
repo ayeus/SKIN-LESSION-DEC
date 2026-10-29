@@ -11,7 +11,7 @@ from threading import BoundedSemaphore
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from .db import Base, engine, Session, Dataset, Run, Audit, ROOT
 from .services import images, tabular, analytics, text
@@ -172,7 +172,7 @@ def model_ready():
 
         load_artifact(Path(directory))
         return True
-    except (OSError, ValueError, KeyError, RuntimeError):
+    except (OSError, ValueError, KeyError, RuntimeError, ImportError):
         return False
 
 
@@ -437,7 +437,12 @@ async def inference(
         rgb = images.decode(await upload_bytes(file))
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
-    from .services.ml import predict, gradcam
+    try:
+        from .services.ml import predict, gradcam
+    except ImportError as error:
+        raise HTTPException(
+            503, "CNN runtime unavailable; install the ML dependencies"
+        ) from error
 
     # Image bytes are never retained here. Scores are stored only with explicit opt-in.
     audit("inference_requested", "ephemeral", _.id)
@@ -539,6 +544,14 @@ class TrainingRequest(BaseModel):
     epochs: int = Field(default=5, ge=1, le=1000)
     batch_size: int = Field(default=16, ge=1, le=128)
     pretrained: bool = False
+
+    @model_validator(mode="after")
+    def supported_pretraining(self):
+        if self.architecture == "small_cnn" and self.pretrained:
+            raise ValueError(
+                "Small CNN has no ImageNet weights; choose ResNet/EfficientNet or disable pretraining"
+            )
+        return self
 
 
 @app.get("/training/readiness")
