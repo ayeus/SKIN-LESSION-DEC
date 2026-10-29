@@ -1,5 +1,6 @@
 "use client";
 import TrainingPanel from "./components/training-panel";
+import ForecastEvidence from "./components/forecast-evidence";
 import AccountLogin from "./components/account-login";
 import AccountPanel from "./components/account-panel";
 import DatasetExplorer from "./components/dataset-explorer";
@@ -89,7 +90,7 @@ const descriptions: Record<string, string> = {
   datasets: "Import authorized research data with traceable provenance.",
   preprocess: "Standardize data without overwriting your source.",
   text: "Explore clinical language with clearly scoped methods.",
-  forecast: "Build temporal baselines from observed daily arrivals.",
+  forecast: "Build temporal baselines from observed daily operational counts.",
   planning: "Separate observed demand, forecasts and your assumptions.",
   reduce: "Explore numeric research features.",
   research: "Study observational associations in adult datasets.",
@@ -194,13 +195,14 @@ function Results({
       )}
       {r.forecast && (
         <>
-          <h3>Observed daily arrivals</h3>
+          <h3>Observed daily counts</h3>
           <Chart data={r.observed} keys={["count"]} />
           <h3>Forecast and empirical residual band</h3>
           <Chart data={r.forecast} keys={["count", "lower", "upper"]} />
           <p>{r.uncertainty}</p>
         </>
       )}
+      <ForecastEvidence result={r} Chart={Chart} />
       {r.monthly_trend && <Chart data={r.monthly_trend} keys={["count"]} />}
       {r.history && (
         <>
@@ -543,6 +545,12 @@ export default function Home() {
           p.horizon = Number(fd.get("horizon"));
           if (fd.get("capacity"))
             p.patients_per_staff_per_shift = Number(fd.get("capacity"));
+          if (fd.get("shift_fractions"))
+            p.shift_arrival_fractions = String(fd.get("shift_fractions"))
+              .split(",")
+              .map((v) => Number(v.trim()));
+          if (fd.get("shift_hours"))
+            p.shift_hours = Number(fd.get("shift_hours"));
         }
         if (type === "reduce" || type === "research") {
           p.features = String(fd.get("features"))
@@ -901,7 +909,7 @@ export default function Home() {
                       {[
                         ["ehr", "EHR records"],
                         ["clinical_text", "Clinical documents"],
-                        ["demand", "Patient arrival history"],
+                        ["demand", "Demand time series"],
                         ["weight", "Adult weight & behavior"],
                       ].map(([key, name]) => (
                         <div className="readiness" key={key}>
@@ -1319,7 +1327,7 @@ export default function Home() {
                             />
                           </label>
                           <label>
-                            Arrival count column
+                            Observed count column
                             <input
                               name="count_column"
                               defaultValue="count"
@@ -1345,6 +1353,24 @@ export default function Home() {
                               min="0.01"
                               step="any"
                               placeholder="Your operational assumption"
+                            />
+                          </label>
+                          <label>
+                            Optional shift arrival fractions (comma separated)
+                            <input
+                              name="shift_fractions"
+                              placeholder="Your explicit proportions, summing to 1"
+                            />
+                          </label>
+                          <label>
+                            Shift duration (hours, required with shift
+                            fractions)
+                            <input
+                              name="shift_hours"
+                              type="number"
+                              min="0.25"
+                              max="24"
+                              step="0.25"
                             />
                           </label>
                         </div>

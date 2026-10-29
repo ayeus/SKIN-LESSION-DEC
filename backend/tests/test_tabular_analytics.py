@@ -61,7 +61,7 @@ def test_forecast_seasonality_and_explicit_scenario():
     assert result["selected"] == "weekly_seasonal"
     assert result["validation_metrics"]["weekly_seasonal"]["mae"] == 0
     assert [v["count"] for v in result["forecast"]] == [4, 8, 12, 16, 20, 24, 28]
-    assert result["scenario"]["staff_per_shift"] == [1, 2, 3, 4, 5, 6, 7]
+    assert result["scenario"]["required_staff_shifts_per_day"] == [1, 2, 3, 4, 5, 6, 7]
     assert "scenario" not in forecast(demand(), {})
 
 
@@ -80,12 +80,16 @@ def test_temporal_validation_does_not_see_future():
     b.loc[69, "count"] = 1000
     ra = forecast(a, {})
     rb = forecast(b, {})
-    # Validation predictions at the final origin remain seasonal baseline from t-7;
-    # final shock changes only residual, never the prediction at that origin.
-    assert rb["validation_metrics"]["weekly_seasonal"]["mae"] == pytest.approx(
-        (1000 - 28) / 14
+    assert ra["selected"] == rb["selected"] == "weekly_seasonal"
+    assert (
+        ra["validation_metrics"] == rb["validation_metrics"]
+    )  # Future shock cannot change selection/validation.
+    assert rb["test_metrics"]["mae"] == pytest.approx((1000 - 28) / 14)
+    assert ra["test_metrics"]["mae"] == 0
+    assert (
+        ra["test_predictions"][-1]["predicted"]
+        == rb["test_predictions"][-1]["predicted"]
     )
-    assert ra["validation_metrics"]["weekly_seasonal"]["mae"] == 0
 
 
 def test_pca_and_held_out_regression():

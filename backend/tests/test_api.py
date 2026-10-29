@@ -134,3 +134,36 @@ def test_background_run_reaches_persisted_terminal_state():
             time.sleep(0.02)
         assert run["status"] == "completed", run
         assert len(run["result"]["coordinates"]) == 4
+
+
+def test_analysis_report_keeps_source_provenance_and_scope():
+    from backend.app.db import Dataset, Session
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/datasets",
+            headers=H,
+            data={
+                "modality": "tabular",
+                "source": "isolated scoped fixture",
+                "license": "test-only",
+                "authorized": "true",
+            },
+            files={"file": ("fixture.csv", b"x,y\n1,2\n3,4")},
+        )
+        id = response.json()["id"]
+        with Session() as session:
+            dataset = session.get(Dataset, id)
+            dataset.profile = {
+                **dataset.profile,
+                "research_scope": {"limitations": "Isolated source scope fixture"},
+            }
+            session.commit()
+        result = client.post(
+            "/analyze/overview", headers=H, json={"dataset_id": id}
+        ).json()["result"]
+        assert result["dataset_provenance"]["id"] == id
+        assert result["dataset_provenance"]["source"] == "isolated scoped fixture"
+        assert len(result["dataset_provenance"]["sha256"]) == 64
+        assert "path" not in result["dataset_provenance"]
+        assert result["data_scope"]["limitations"] == "Isolated source scope fixture"

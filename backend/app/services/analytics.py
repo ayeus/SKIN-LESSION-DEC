@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -14,107 +13,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from .tabular import clean_json, profile
 
 
-def forecast(df, p):
-    date = p.get("date_column", "date")
-    count = p.get("count_column", "count")
-    if date not in df or count not in df:
-        raise ValueError("Map date_column and count_column to observed daily data")
-    dates = pd.to_datetime(
-        df[date], format=p.get("date_format", "%Y-%m-%d"), errors="raise"
-    )
-    values = pd.to_numeric(df[count], errors="raise")
-    if (
-        dates.isna().any()
-        or values.isna().any()
-        or not np.isfinite(values).all()
-        or (values < 0).any()
-    ):
-        raise ValueError("Dates/counts must be present; counts finite and nonnegative")
-    if not (dates == dates.dt.normalize()).all():
-        raise ValueError("Daily observations must use dates without times")
-    ordered = pd.Series(values.to_numpy(), index=dates).sort_index()
-    if ordered.index.duplicated().any():
-        raise ValueError(
-            "Duplicate daily dates: aggregate with documented policy first"
-        )
-    if len(ordered) < 28:
-        raise ValueError(
-            "At least 28 complete daily observations are required for baseline comparison"
-        )
-    if not ordered.index.equals(
-        pd.date_range(ordered.index.min(), ordered.index.max(), freq="D")
-    ):
-        raise ValueError(
-            "Missing days; do not silently interpret missing observations as zero"
-        )
-    horizon = int(p.get("horizon", 7))
-    if not 1 <= horizon <= 90:
-        raise ValueError("horizon must be 1–90 days")
-    y = ordered.to_numpy(dtype=float)
-    cut = max(14, int(len(y) * 0.8))
-    train, test = y[:cut], y[cut:]
-    # Rolling one-step evaluation: each validation origin sees only earlier observations.
-    predictions = {
-        name: [] for name in ("last_value", "weekly_seasonal", "rolling_mean")
-    }
-    for i in range(cut, len(y)):
-        predictions["last_value"].append(y[i - 1])
-        predictions["weekly_seasonal"].append(y[i - 7])
-        predictions["rolling_mean"].append(y[i - 7 : i].mean())
-    metrics = {
-        name: {
-            "mae": mean_absolute_error(test, v),
-            "rmse": float(np.sqrt(mean_squared_error(test, v))),
-        }
-        for name, v in predictions.items()
-    }
-    # Select on validation. No independent test estimate is claimed.
-    selected = min(metrics, key=lambda n: metrics[n]["mae"])
-    history = list(y)
-    future = []
-    for _ in range(horizon):
-        v = (
-            history[-1]
-            if selected == "last_value"
-            else history[-7]
-            if selected == "weekly_seasonal"
-            else float(np.mean(history[-7:]))
-        )
-        future.append(float(v))
-        history.append(v)
-    errors = np.abs(test - np.array(predictions[selected]))
-    radius = float(np.quantile(errors, 0.9))
-    dates_future = pd.date_range(
-        ordered.index[-1] + pd.Timedelta(days=1), periods=horizon, freq="D"
-    )
-    result = {
-        "selected": selected,
-        "validation_metrics": metrics,
-        "validation_protocol": "Rolling one-step temporal validation, used for model selection; no independent test. Multi-step forecast error may be larger.",
-        "observed": [{"date": d.isoformat(), "count": v} for d, v in ordered.items()],
-        "forecast": [
-            {
-                "date": d.isoformat(),
-                "count": v,
-                "lower": max(0, v - radius),
-                "upper": v + radius,
-            }
-            for d, v in zip(dates_future, future)
-        ],
-        "uncertainty": "Empirical 90th-percentile absolute one-step validation residual band; not a calibrated multi-step prediction interval.",
-        "weekday_means": ordered.groupby(ordered.index.dayofweek).mean().to_dict(),
-    }
-    capacity = p.get("patients_per_staff_per_shift")
-    if capacity is not None:
-        capacity = float(capacity)
-        if not np.isfinite(capacity) or capacity <= 0:
-            raise ValueError("Explicit capacity assumption must be finite and positive")
-        result["scenario"] = {
-            "assumption_patients_per_staff_per_shift": capacity,
-            "staff_per_shift": [math.ceil(v / capacity) for v in future],
-            "label": "User-defined capacity scenario; ignores skill mix, shift coverage and queueing. Not a staffing prescription.",
-        }
-    return clean_json(result)
+from .forecasting import forecast
 
 
 def numeric_matrix(df, columns):

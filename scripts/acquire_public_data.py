@@ -18,12 +18,34 @@ ROOT = Path("data").resolve()
 
 def acquire(url, destination, license, source, expected=None):
     destination.parent.mkdir(parents=True, exist_ok=True)
+    receipt = destination.with_suffix(destination.suffix + ".provenance.json")
+    if destination.exists():
+        if not receipt.is_file():
+            raise ValueError(
+                "Existing raw file has no source receipt; review/move it before a fresh download"
+            )
+        prior = json.loads(receipt.read_text())
+        if prior.get("url") != url:
+            raise ValueError(
+                "Existing raw file belongs to a different source URL; refuse relabeling"
+            )
+        with destination.open("rb") as stream:
+            current = hashlib.file_digest(stream, "sha256").hexdigest()
+        if current != prior.get("sha256"):
+            raise ValueError(
+                "Existing raw file changed since acquisition; review before reuse"
+            )
     if not destination.exists():
         part = destination.with_suffix(destination.suffix + ".part")
         offset = part.stat().st_size if part.exists() else 0
         headers = {"Accept-Encoding": "identity"}
         if offset:
             headers["Range"] = f"bytes={offset}-"
+            resource = destination.parent / "archive-resource.json"
+            if resource.is_file():
+                metadata = json.loads(resource.read_text())
+                if metadata.get("url") == url and metadata.get("etag"):
+                    headers["If-Range"] = metadata["etag"]
         with requests.get(
             url, stream=True, timeout=(15, 90), headers=headers
         ) as response:

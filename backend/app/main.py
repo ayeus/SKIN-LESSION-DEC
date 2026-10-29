@@ -319,7 +319,7 @@ def analyze(
     if dataset.modality not in allowed[kind]:
         raise HTTPException(422, f"{kind} is incompatible with {dataset.modality}")
 
-    def work(id):
+    def calculate(id):
         if kind == "preprocess":
             output, result = tabular.transform(df, p)
             directory = ROOT / "processed" / id
@@ -335,6 +335,20 @@ def analyze(
         if kind == "text":
             return text.analyze(df, p)
         return analytics.strategic(df, p)
+
+    def work(id):
+        result = calculate(id)
+        result["dataset_provenance"] = {
+            "id": dataset.id,
+            "name": dataset.name,
+            "modality": dataset.modality,
+            "source": dataset.source,
+            "license": dataset.license,
+            "sha256": dataset.sha256,
+        }
+        if dataset.profile.get("research_scope"):
+            result["data_scope"] = dataset.profile["research_scope"]
+        return result
 
     if not background:
         return execute(kind, p, work, dataset.id, owner_id=_.id)
