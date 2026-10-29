@@ -8,7 +8,7 @@ Public MIMIC-IV demo EHR and NHANES adult data have now been acquired and exerci
 
 | Tutorial | Implemented feature / algorithm | Source | UI | Evidence | Remaining |
 |---|---|---|---|---|---|
-| T1 | Authorized CSV/XLSX/FHIR-subset imports, filtered browsing, key relationships, provenance, token/audit | backend/app/main.py, db.py, services/tabular.py | EHR & datasets | test_api.py, test_fhir.py, test_relationships.py; real MIMIC verification | Public MIMIC EHR relationships verified; full FHIR and multi-user controls remain incomplete |
+| T1 | Authorized CSV/XLSX/FHIR-subset imports, filtered browsing, key relationships, provenance, local accounts/roles/ownership/grants/audit | backend/app/main.py, db.py, services/tabular.py | EHR & datasets | test_api.py, test_fhir.py, test_relationships.py; real MIMIC verification | Public MIMIC EHR relationships verified; full FHIR and production/SSO controls remain incomplete; local identity/grants tested |
 | T2 | Names/types/dates/units/categories/ranges/text, immutable transform | services/tabular.py | Preprocessing | test_tabular_analytics.py conversion/source tests | Real dictionaries and validation |
 | T3 | Exact duplicate removal, repeated-key and fuzzy candidate review, missingness/imputation/history | services/tabular.py | Preprocessing | encounter preservation and near-duplicate tests | Context-aware real EHR review |
 | T4 | Enhancement/restoration, masks/contours, JPEG/PNG/WebP, SSIM/PSNR/Dice/IoU | services/images.py | Image lab | test_images.py known disk, identity, noise properties | Expert masks and diagnostic-detail assessment |

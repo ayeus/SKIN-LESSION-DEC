@@ -109,7 +109,9 @@ it("surfaces API authentication failures without inventing metrics", async () =>
   );
   await user.click(screen.getByRole("button", { name: "Connect workspace" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Valid research access token required",
+    "Your session expired or access was revoked. Sign in again.",
   );
+  expect(screen.getByLabelText("Research access token")).toBeVisible();
+  expect(screen.queryByText("Imported datasets")).not.toBeInTheDocument();
   expect(screen.getByText("API not connected")).toBeVisible();
 });

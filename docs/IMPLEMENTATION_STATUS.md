@@ -5,10 +5,10 @@
 ## Executed with real public data
 - MIMIC-IV demo 2.2: 100 patients, 275 encounters, 4,506 diagnosis rows; publisher checksums, primary/foreign key relationships and code dictionary verified. Imported into local registry; actual date transformation run persisted.
 - NHANES 2017–2018: component joining, adult inclusion and documented special-code handling; real held-out unweighted exploratory BMI research executed. Weak measured fit retained honestly. See DATA_ACQUISITION.md.
-- ISIC2018/HAM10000: 10,015 labels and 7,470 lesion groups validated; group-disjoint split verified. Large image archive still downloading. No clinical score/model claim.
+- ISIC2018/HAM10000: administrator-only disk-byte/source-size/class-distribution status; 10,015 labels and 7,470 lesion groups validated; group-disjoint split verified. Large image archive still downloading. No clinical score/model claim.
 
 ## Implemented and tested
-- Authenticated local research API, immutable imports, run/audit metadata, SQLAlchemy and migrations, separate filesystem artifacts.
+- Local user accounts with administrator/researcher/viewer roles, salted password hashes, expiring/revocable sessions and login cooldowns; dataset ownership/read grants, actor audit attribution and administrator audit review and scoped reports/counts. Immutable imports, SQLAlchemy migrations and separate filesystem artifacts. No seeded real accounts.
 - Classical image enhancement/restoration/normalization, segmentation/contours, compression and metrics, SIFT/RANSAC, actual failure reporting.
 - CNN CLI **and web training**: dataset preflight, one active training run, persistent job/epoch progress, actual checkpoints/curves/embeddings, explicit artifact selection after review, checksum/preprocessing checks and ephemeral inference/Grad-CAM, downloadable actual result reports and opt-in score/hash retention without image storage. No automatic promotion or placeholder classifier.
 - CSV/XLSX and strict de-identified FHIR R4 collection subset; linked Patient/Encounter/Observation/Condition validation. Unsupported/identifying fields rejected before raw persistence. Not full FHIR conformance.
@@ -18,14 +18,14 @@
 - Integrated Next.js workspace, result charts, report inspection/export, honest missing-input states.
 
 ## Current verification
-- **51 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
-- **17 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. This verifies DB-backed API integration, not the complete Compose deployment.
-- **9 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
+- **58 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
+- **24 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. This verifies DB-backed API integration, not the complete Compose deployment.
+- **12 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
 - Native Chrome navigation available, but application web content absent from accessibility tree and screenshot returned black. Browser flow/visual/viewport verification remains NOT VERIFIED; HTTP/component/build checks do not substitute.
 
 ## Remaining implementation and validation
 - Complete real image download, full content/duplicate checks, real model experiments and selection based on validation evidence. Patient-disjoint/external/skin-tone evaluation remains required.
-- Production identity/roles/per-user ownership, SSO, encryption-at-rest and institutional privacy controls. Current access is single-owner local token only.
+- SSO/MFA, encryption-at-rest, password recovery, distributed throttling and institutional privacy controls remain unimplemented. Local identity/roles/ownership are now implemented and tested; they are not production or clinical approval.
 - Distributed durable task queue; current bounded in-process jobs mark interrupted work failed on restart. One API worker only.
 - Genuine clinical notes/labels/gold entities/relevance judgments and licensed clinical model validation; genuine hospital demand and explicit operational staffing policies.
 - Advanced staffing optimization, calibrated multi-step intervals, complex-survey/causal inference. Optional UMAP/SHAP/transformers not claimed implemented.

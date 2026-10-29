@@ -1,5 +1,7 @@
 "use client";
 import TrainingPanel from "./components/training-panel";
+import AccountLogin from "./components/account-login";
+import AccountPanel from "./components/account-panel";
 import DatasetExplorer from "./components/dataset-explorer";
 import { useEffect, useState, FormEvent } from "react";
 import {
@@ -423,6 +425,7 @@ function Results({
 export default function Home() {
   const [token, setToken] = useState(""),
     [entry, setEntry] = useState(""),
+    [lockNotice, setLockNotice] = useState(""),
     [page, setPage] = useState("dashboard"),
     [status, setStatus] = useState<Result | null>(null),
     [datasets, setDatasets] = useState<Dataset[]>([]),
@@ -441,6 +444,16 @@ export default function Home() {
       headers: { Authorization: "Bearer " + token, ...init.headers },
     });
     if (!response.ok) {
+      if (response.status === 401) {
+        setToken("");
+        setStatus(null);
+        setDatasets([]);
+        setRuns([]);
+        setResult(null);
+        setLockNotice(
+          "Your session expired or access was revoked. Sign in again.",
+        );
+      }
       let body;
       try {
         body = await response.json();
@@ -666,7 +679,15 @@ export default function Home() {
             <button
               className="icon-button"
               aria-label="Lock workspace"
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  await api("/auth/logout", { method: "POST" });
+                  setLockNotice("");
+                } catch {
+                  setLockNotice(
+                    "Browser access cleared; server session revocation could not be confirmed. It will expire automatically.",
+                  );
+                }
                 setToken("");
                 setStatus(null);
                 setDatasets([]);
@@ -691,6 +712,11 @@ export default function Home() {
             <section className="access-panel">
               <ShieldCheck size={34} />
               <h2>Open your research workspace</h2>
+              {lockNotice && (
+                <p role="alert" className="notice">
+                  {lockNotice}
+                </p>
+              )}
               <p>
                 Enter the local API access token configured in your environment.
                 Authorized, de-identified datasets only.
@@ -714,12 +740,28 @@ export default function Home() {
                 />
                 <button className="primary">Connect workspace</button>
               </form>
+              <details>
+                <summary>Sign in with a local account</summary>
+                <AccountLogin
+                  onToken={(token) => {
+                    setLockNotice("");
+                    setToken(token);
+                  }}
+                />
+              </details>
               <small>
                 Token stays in memory and clears when this page closes.
               </small>
             </section>
           ) : (
             <>
+              {status?.access?.role === "viewer" && (
+                <p className="notice">
+                  Read-only account: inspect explicitly granted datasets.
+                  Uploading, creating analyses and retaining predictions require
+                  researcher or administrator access.
+                </p>
+              )}
               {error && (
                 <div className="error" role="alert">
                   <AlertCircle size={18} />
@@ -1013,7 +1055,10 @@ export default function Home() {
                           history. Uploaded image and heatmap are not stored.
                         </label>
                       )}
-                      <button className="primary" disabled={busy}>
+                      <button
+                        className="primary"
+                        disabled={busy || status?.access?.role === "viewer"}
+                      >
                         {busy
                           ? "Executing…"
                           : page === "registration"
@@ -1080,7 +1125,10 @@ export default function Home() {
                         research use. This does not automatically remove
                         identifiers.
                       </label>
-                      <button className="primary" disabled={busy}>
+                      <button
+                        className="primary"
+                        disabled={busy || status?.access?.role === "viewer"}
+                      >
                         {busy ? "Validating…" : "Validate & import"}
                       </button>
                     </form>
@@ -1461,6 +1509,9 @@ export default function Home() {
                 </section>
               )}
               {page === "settings" && (
+                <AccountPanel api={api} datasets={datasets} />
+              )}
+              {page === "settings" && (
                 <section className="panel">
                   <h2>Environment & scientific readiness</h2>
                   <p>
@@ -1468,6 +1519,55 @@ export default function Home() {
                     uses a local single-owner token, not production multi-user
                     identity management.
                   </p>
+                  {status?.lesion_source?.bytes_on_disk !== undefined && (
+                    <div className="notice">
+                      <h3>Measured lesion-data acquisition</h3>
+                      <p>
+                        {(
+                          status.lesion_source.bytes_on_disk /
+                          1024 ** 2
+                        ).toFixed(1)}{" "}
+                        MiB on disk
+                        {status.lesion_source.expected_bytes
+                          ? ` of ${(status.lesion_source.expected_bytes / 1024 ** 2).toFixed(1)} MiB from the source response`
+                          : ""}
+                        . State: {status.lesion_source.state}.
+                      </p>
+                      {status.lesion_source.fraction_on_disk !== null &&
+                        status.lesion_source.fraction_on_disk !== undefined && (
+                          <progress
+                            max={1}
+                            value={status.lesion_source.fraction_on_disk}
+                          />
+                        )}
+                      <p>{status.lesion_source.note}</p>
+                      {status.lesion_source.class_distribution && (
+                        <>
+                          <h3>Class labels in the actual manifest</h3>
+                          <div className="table-wrap">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Source label</th>
+                                  <th>Manifest images</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(
+                                  status.lesion_source.class_distribution,
+                                ).map(([label, count]) => (
+                                  <tr key={label}>
+                                    <td>{label}</td>
+                                    <td>{String(count)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <pre>{JSON.stringify(status, null, 2)}</pre>
                   <h3>Required inputs</h3>
                   <ul>
