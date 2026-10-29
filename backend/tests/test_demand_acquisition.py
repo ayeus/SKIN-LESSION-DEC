@@ -1,6 +1,7 @@
 """Isolated source-contract fixtures, never application observations."""
 
 import json
+from pathlib import Path
 import hashlib
 import pandas as pd
 import pytest
@@ -68,3 +69,26 @@ def test_raw_cache_cannot_be_relabelled_or_tampered(tmp_path, monkeypatch):
         acquisition.acquire(
             "https://example.test/original", path, "test license", "test source"
         )
+
+
+def test_relative_cached_destination_is_resolved_before_provenance_logging(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(acquisition, "ROOT", tmp_path)
+    path = tmp_path / "source.json"
+    path.write_bytes(b"fixture")
+    path.with_suffix(".json.provenance.json").write_text(
+        json.dumps(
+            {
+                "url": "https://example.test/source",
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    )
+    assert (
+        acquisition.acquire(
+            "https://example.test/source", Path("source.json"), "test", "test"
+        )
+        == path
+    )

@@ -1,4 +1,5 @@
 "use client";
+import ClinicalModelPanel from "./components/clinical-model-panel";
 import TrainingPanel from "./components/training-panel";
 import EmbeddingView from "./components/embedding-view";
 import ForecastEvidence from "./components/forecast-evidence";
@@ -1449,6 +1450,13 @@ export default function Home() {
                     </form>
                   )}
                 </section>
+              )}
+              {page === "text" && (
+                <ClinicalModelPanel
+                  api={api}
+                  onResult={setResult}
+                  canSelect={status?.access?.role === "admin"}
+                />
               )}
               {page === "training" && (
                 <TrainingPanel

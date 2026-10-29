@@ -821,3 +821,50 @@ def audit_events(
         statement = statement.where(Audit.action == action)
     with Session() as session:
         return [serialize(item) for item in session.scalars(statement)]
+
+
+@app.get("/clinical-models/current")
+def current_clinical_model(_: Protected):
+    from . import clinical_training
+
+    try:
+        root = clinical_training.selected_directory()
+        if root is None:
+            raise HTTPException(409, "No clinical NER model selected")
+        return {
+            "model_card": clinical_training.validate_model(root),
+            "research_only": True,
+        }
+    except (ValueError, OSError, KeyError) as error:
+        raise HTTPException(
+            409, "Clinical artifact validation failed: " + str(error)
+        ) from error
+
+
+@app.post("/clinical-models/select/{id}")
+def select_clinical_model(id: str, _: Protected):
+    require_admin(_)
+    from . import clinical_training
+
+    if os.getenv("DERMA_NER_MODEL"):
+        raise HTTPException(
+            409,
+            "DERMA_NER_MODEL overrides selection; remove it before selecting in the UI",
+        )
+    with Session() as session:
+        item = session.get(Run, id)
+    if item is None:
+        raise HTTPException(404, "Clinical training run not found")
+    if item.kind != "clinical_ner_training" or item.status != "completed":
+        raise HTTPException(
+            409, "Select only a completed clinical NER training run after review"
+        )
+    try:
+        report = json.loads((ROOT / "processed" / item.id / "report.json").read_text())
+        selected = clinical_training.select_artifact(report["training_run_id"], item.id)
+    except (ValueError, OSError, KeyError, ImportError) as error:
+        raise HTTPException(
+            409, "Clinical artifact selection failed: " + str(error)
+        ) from error
+    audit("clinical_model_selected", item.id, _.id)
+    return selected

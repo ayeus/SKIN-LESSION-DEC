@@ -9,27 +9,29 @@
 
 - UKHSA England COVID admissions: 120 complete historical daily counts; 72/24/24 chronological split, validation-only ridge selection, independent test MAE 46.75973/RMSE 58.55738 counts and separate seven-day recursive retrospective check. Missing source days rejected, no staffing policy inferred. See DATA_ACQUISITION.md.
 
+- MACCROBAT2020: all 200 text/annotation pairs validated; actual mention-type classification, weak-separation clustering and lexical retrieval; locally trained 41-type NER with 140/30/30 document split, held-out exact contiguous-span F1 0.53319471 and authenticated HTTP inference/export verified. No clinical effectiveness or hospital-note generalization claim. See CLINICAL_NLP.md.
+
 ## Implemented and tested
 - Local user accounts with administrator/researcher/viewer roles, salted password hashes, expiring/revocable sessions and login cooldowns; dataset ownership/read grants, actor audit attribution and administrator audit review and scoped reports/counts. Immutable imports, SQLAlchemy migrations and separate filesystem artifacts. No seeded real accounts.
 - Classical image enhancement/restoration/normalization, segmentation/contours, compression and metrics, SIFT/RANSAC, actual failure reporting.
 - CNN CLI **and web training**: dataset preflight, one active training run, persistent job/epoch progress, actual checkpoints/curves/embeddings, explicit artifact selection after review, checksum/preprocessing checks and ephemeral inference/Grad-CAM, downloadable actual result reports and opt-in score/hash retention without image storage. No automatic promotion or placeholder classifier.
 - CSV/XLSX and strict de-identified FHIR R4 collection subset; linked Patient/Encounter/Observation/Condition validation. Unsupported/identifying fields rejected before raw persistence. Not full FHIR conformance.
 - Reproducible tabular cleaning, quality/missingness, exact deduplication, near-duplicate review, explicit conversions and imputation. Read-only paginated/filterable dataset explorer and explicit many-to-one EHR relationship inspection; repeated encounters preserved.
-- Genuine-label TF-IDF classifier, clustering, BM25/TF-IDF retrieval and contextual sense ranking; licensed local clinical NER adapter.
+- Genuine-label TF-IDF classifier, clustering, BM25/TF-IDF retrieval and contextual sense ranking; licensed local clinical NER adapter, real corpus training, checkpoint selection, SHA-verified explicit model review/selection and unknown negation.
 - Daily demand baselines and autoregressive ridge, separate chronological selection/test, dimensioned staff-shifts/day and explicit per-shift capacity scenarios, historical indicators, PCA/t-SNE and observational modeling/diagnostics/sensitivity. Interactive 2D/rotatable 3D actual-coordinate viewing, variance table, input-row inspection and disclosed bounded display. Constant-feature matrices rejected instead of emitting undefined variance. Real 5,569-adult NHANES 3D PCA and t-SNE runs persisted.
 - Integrated Next.js workspace, result charts, report inspection/export, honest missing-input states.
 
 ## Current verification
-- **78 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
-- **27 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. The complete Compose stack also passed isolated build/migration/HTTP/account/image-processing/export/runtime-gate checks; disposable resources removed.
-- **18 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
+- **83 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
+- **31 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. The complete Compose stack also passed isolated build/migration/HTTP/account/image-processing/export/runtime-gate checks; disposable resources removed.
+- **20 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
 - Native Chrome navigation available, but application web content absent from accessibility tree and screenshot returned black. Browser flow/visual/viewport verification remains NOT VERIFIED; HTTP/component/build checks do not substitute.
 
 ## Remaining implementation and validation
 - Complete real image download, full content/duplicate checks, real model experiments and selection based on validation evidence. Patient-disjoint/external/skin-tone evaluation remains required.
 - SSO/MFA, encryption-at-rest, password recovery, distributed throttling and institutional privacy controls remain unimplemented. Local identity/roles/ownership are now implemented and tested; they are not production or clinical approval.
 - Distributed durable task queue; current bounded in-process jobs mark interrupted work failed on restart. One API worker only.
-- Genuine clinical notes/labels/gold entities/relevance judgments and licensed clinical model validation; genuine hospital demand and explicit operational staffing policies.
+- Institutional clinical-note generalization, expert relevance/sense judgments, negation/normalization and external clinical-model validation; hospital-specific demand and operational staffing policies.
 - Advanced staffing optimization, calibrated multi-step intervals, complex-survey/causal inference. Optional UMAP/SHAP/transformers not claimed implemented.
 - Full FHIR interoperability, complete browser/accessibility/responsive review.
 

@@ -17,6 +17,11 @@ ROOT = Path("data").resolve()
 
 
 def acquire(url, destination, license, source, expected=None):
+    destination = Path(destination).resolve()
+    if not destination.is_relative_to(ROOT):
+        raise ValueError(
+            "Acquisition destination must be within configured data storage"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     receipt = destination.with_suffix(destination.suffix + ".provenance.json")
     if destination.exists():

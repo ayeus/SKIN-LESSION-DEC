@@ -89,6 +89,7 @@ def check():
                 "backend/tests/test_training_api.py",
                 "backend/tests/test_relationships.py",
                 "backend/tests/test_identity.py",
+                "backend/tests/test_clinical_corpus.py",
                 "-q",
             ],
             env=env,

@@ -86,6 +86,8 @@ def analyze(df, p):
             "train_rows": len(train),
             "limitation": "Held-out research baseline. Without patient grouping repeated-note leakage cannot be excluded.",
         }
+    if task == "ner":
+        return clinical_entities(docs)
     vectorizer = TfidfVectorizer(max_features=10000, ngram_range=(1, 2))
     x = vectorizer.fit_transform(docs)
     if task == "cluster":
@@ -162,24 +164,18 @@ def analyze(df, p):
 
 def clinical_entities(docs):
     """Owner-provided local clinical model; model card and license required."""
-    import os
-    import json
     from pathlib import Path
 
-    path = os.getenv("DERMA_NER_MODEL")
+    from ..clinical_training import selected_directory, validate_model
+
+    path = selected_directory()
     if not path:
         raise ValueError("BLOCKED: supply a licensed clinical NER model and model card")
     root = Path(path)
     card = root / "research-model-card.json"
     if not card.is_file():
         raise ValueError("Clinical model requires research-model-card.json")
-    metadata = json.loads(card.read_text())
-    if not all(
-        metadata.get(k) for k in ("source", "license", "intended_use", "limitations")
-    ):
-        raise ValueError(
-            "Model card requires source, license, intended_use and limitations"
-        )
+    metadata = validate_model(root)
     try:
         import spacy
     except ImportError as error:
