@@ -4,9 +4,12 @@ import numpy as np
 
 def read_table(path):
     suffix = path.suffix.lower()
-    if suffix == '.csv': frame = pd.read_csv(path)
+    if suffix == '.json':
+        from .fhir import parse
+        frame=parse(path.read_bytes())
+    elif suffix == '.csv': frame = pd.read_csv(path)
     elif suffix == '.xlsx': frame = pd.read_excel(path)
-    else: raise ValueError('Supported table formats are CSV and XLSX')
+    else: raise ValueError('Supported table formats are CSV, XLSX and the documented FHIR JSON subset')
     if len(frame)>100_000 or len(frame.columns)>200: raise ValueError('Research import limit: 100,000 rows and 200 columns')
     if frame.empty or not frame.columns.is_unique: raise ValueError('Dataset must be nonempty with unique columns')
     return frame

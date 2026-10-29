@@ -1,31 +1,34 @@
-# Latest data checkpoint
+# Implementation status — 2026-10-29
 
-Public MIMIC-IV demo EHR and NHANES adult data have now been acquired and exercised. ISIC2018 labels/groups validated; image archive downloading; CNN training not performed. See [DATA_ACQUISITION.md](DATA_ACQUISITION.md). Earlier no-data statements below describe the initial implementation checkpoint, not current acquisition status.
+**INCOMPLETE.** Real public EHR and adult research workflows execute. Lesion metadata is validated, but image acquisition is incomplete and no genuine lesion model is trained/selected. Clinical validation is not established.
 
-# Implementation status
+## Executed with real public data
+- MIMIC-IV demo 2.2: 100 patients, 275 encounters, 4,506 diagnosis rows; publisher checksums, primary/foreign key relationships and code dictionary verified. Imported into local registry; actual date transformation run persisted.
+- NHANES 2017–2018: component joining, adult inclusion and documented special-code handling; real held-out unweighted exploratory BMI research executed. Weak measured fit retained honestly. See DATA_ACQUISITION.md.
+- ISIC2018/HAM10000: 10,015 labels and 7,470 lesion groups validated; group-disjoint split verified. Large image archive still downloading. No clinical score/model claim.
 
-**INCOMPLETE — real-data evaluation and clinical validation blocked.** No genuine lesion model is installed and no healthcare observations have been fabricated.
+## Implemented and tested
+- Authenticated local research API, immutable imports, run/audit metadata, SQLAlchemy and migrations, separate filesystem artifacts.
+- Classical image enhancement/restoration/normalization, segmentation/contours, compression and metrics, SIFT/RANSAC, actual failure reporting.
+- CNN CLI **and web training**: dataset preflight, one active training run, persistent job/epoch progress, actual checkpoints/curves/embeddings, explicit artifact selection after review, checksum/preprocessing checks and ephemeral inference/Grad-CAM. No automatic promotion or placeholder classifier.
+- CSV/XLSX and strict de-identified FHIR R4 collection subset; linked Patient/Encounter/Observation/Condition validation. Unsupported/identifying fields rejected before raw persistence. Not full FHIR conformance.
+- Reproducible tabular cleaning, quality/missingness, exact deduplication, near-duplicate review, explicit conversions and imputation.
+- Genuine-label TF-IDF classifier, clustering, BM25/TF-IDF retrieval and contextual sense ranking; licensed local clinical NER adapter.
+- Daily demand baselines/temporal validation, explicit capacity scenarios, historical indicators, PCA/t-SNE and observational modeling/diagnostics/sensitivity.
+- Integrated Next.js workspace, result charts, report inspection/export, honest missing-input states.
 
-## Implemented and algorithm-tested
-- Next.js/React workspace: all module navigation, token access, real empty states, CSV/XLSX import, schema display, image comparisons, actual result charts, run history and exports.
-- FastAPI: runtime token enforcement, input validation, immutable file storage, SQLAlchemy metadata/audit/run persistence, Alembic migrations. SQLite execution verified; PostgreSQL deployment configuration exists but daemon unavailable.
-- Image laboratory: enhancement/restoration/normalization, threshold/Otsu/GrabCut masks, edges/morphology/contours, JPEG/PNG/WebP encoding, measured PSNR/SSIM, paired-mask Dice/IoU, SIFT descriptors/matching, RANSAC registration and genuine failure handling.
-- CNN CLI: small baseline/ResNet18/EfficientNet, explicit optional ImageNet download, group-aware stratified splits, duplicate-byte leakage checks, augmentation, class weighting, deterministic CPU training, checkpoint checksums, held-out metrics/curves/calibration diagnostics and embeddings. Ephemeral inference and actual Grad-CAM from configured artifact. Synthetic checkpoint round-trip is isolated to tests; no medical model trained.
-- EHR/tabular: schema/quality/missingness, explicit conversions/date formats/unit maps/ranges, exact deduplication, near-duplicate review, imputation and transformation history; source preserved.
-- NLP: genuine-label TF-IDF logistic regression, k-means/hierarchical clustering, BM25/TF-IDF retrieval, context-labeled sense ranking. Licensed local clinical spaCy NER adapter requires model card; never assumed clinically validated.
-- Analytics: daily temporal baselines and validation, empirical residual bands, explicit capacity scenarios, mapped/filterable historical aggregates; PCA/t-SNE; held-out ridge/random-forest comparison, associations, permutation importance, residual diagnostics and sensitivity.
-- Bounded background queue for tabular analyses, persistent statuses and failure/restart reporting. Run one API process; this is not a distributed task queue.
+## Current verification
+- **48 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
+- **14 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. This verifies DB-backed API integration, not the complete Compose deployment.
+- **6 frontend component tests**, TypeScript check and production build pass. Additional training component coverage in progress.
+- Native Chrome navigation available, but application web content absent from accessibility tree and screenshot returned black. Browser flow/visual/viewport verification remains NOT VERIFIED; HTTP/component/build checks do not substitute.
 
-## Verification
-37 backend tests passed in a fresh hash-locked project virtual environment; 6 frontend component tests passed. Typecheck and final production build pass. See TEST_RESULTS.md for commands, warnings and verification limits. No browser screenshot/viewport verification: Computer Use permission not granted. All real datasets and clinical validation remain missing.
+## Remaining implementation and validation
+- Complete real image download, full content/duplicate checks, real model experiments and selection based on validation evidence. Patient-disjoint/external/skin-tone evaluation remains required.
+- Production identity/roles/per-user ownership, SSO, encryption-at-rest and institutional privacy controls. Current access is single-owner local token only.
+- Distributed durable task queue; current bounded in-process jobs mark interrupted work failed on restart. One API worker only.
+- Genuine clinical notes/labels/gold entities/relevance judgments and licensed clinical model validation; genuine hospital demand and explicit operational staffing policies.
+- Advanced staffing optimization, calibrated multi-step intervals, complex-survey/causal inference. Optional UMAP/SHAP/transformers not claimed implemented.
+- Full FHIR interoperability, broader relationship UI, complete browser/accessibility/responsive review and full Compose verification.
 
-## Remaining implementation scope (not merely data blockers)
-- Production users/roles/per-user ownership, SSO, encryption-at-rest and shared-deployment hardening.
-- Full healthcare interoperability/FHIR, patient/encounter relationship model and terminology normalization beyond explicit tabular fields.
-- Durable distributed queue and web-orchestrated CNN training; training currently CLI, progress in history.json.
-- Context-labeled/clinical models and external validation; no clinical NER performance, retrieval relevance evaluation or calibrated medical score claim.
-- Complex-survey/causal inference, clinical staffing optimization with coverage/skills/queue constraints, validated advanced forecasting intervals.
-- Optional UMAP/SHAP/transformers are not installed or claimed implemented. Three-component reduction is available in backend; interactive plot currently displays first two coordinates.
-- Full browser end-to-end, accessibility/responsive visual review and PostgreSQL container verification.
-
-Tutorials remain PARTIAL / REAL-DATA VALIDATION BLOCKED. Consult TUTORIAL_COVERAGE.md for evidence.
+No tutorial is declared fully complete. See coverage matrix, acquisition evidence and verification record.

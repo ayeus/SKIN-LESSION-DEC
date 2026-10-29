@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from .db import Base, engine, Session, Dataset, Run, Audit, ROOT
 from .services import images, tabular, analytics, text
+from . import training
 
 logging.basicConfig(level=logging.INFO,format='%(message)s'); logger=logging.getLogger('dermainsight')
 security=HTTPBearer(auto_error=False)
@@ -80,7 +81,7 @@ def execute(kind,parameters,fn,dataset_id=None,run_id=None):
 def health(): return {'status':'alive','research_only':True}
 
 def model_ready():
-    directory=os.getenv('DERMA_MODEL_DIR')
+    directory=training.selected_directory()
     if not directory: return False
     try:
         from .services.ml import load_artifact
@@ -107,8 +108,14 @@ async def import_dataset(_:Protected,file:UploadFile=File(...),modality:Literal[
     if not authorized: raise HTTPException(422,'Confirm authorized de-identified research use')
     if not source.strip() or not license.strip(): raise HTTPException(422,'Source and license required')
     suffix=Path(file.filename or '').suffix.lower()
-    if suffix not in ('.csv','.xlsx'): raise HTTPException(422,'Use CSV or XLSX')
+    if suffix not in ('.csv','.xlsx','.json'): raise HTTPException(422,'Use CSV, XLSX or the documented FHIR JSON subset')
     data=await upload_bytes(file)
+    if suffix=='.json':
+        if modality!='ehr':raise HTTPException(422,'FHIR imports require EHR modality')
+        try:
+            from .services.fhir import parse
+            parse(data)  # Reject identifying/unsupported fields before persisting raw bytes.
+        except ValueError as error:raise HTTPException(422,str(error)) from error
     if suffix=='.xlsx':
         from zipfile import ZipFile, BadZipFile
         import io
@@ -185,7 +192,7 @@ async def registration(_:Protected,first:UploadFile=File(...),second:UploadFile=
 
 @app.post('/inference')
 async def inference(_:Protected,file:UploadFile=File(...),explain:bool=Form(False)):
-    model=os.getenv('DERMA_MODEL_DIR')
+    model=training.selected_directory()
     if not model: raise HTTPException(409,'No trained lesion model configured. Supply validated dataset, train and set DERMA_MODEL_DIR.')
     try: rgb=images.decode(await upload_bytes(file))
     except ValueError as e: raise HTTPException(422,str(e)) from e
@@ -225,6 +232,57 @@ def export(id:str,format:Literal['json','csv'],_:Protected):
 @app.get('/models/current')
 def current_model(_:Protected):
     if not model_ready(): raise HTTPException(409,'No usable trained model artifact configured')
-    root=Path(os.environ['DERMA_MODEL_DIR'])
+    root=training.selected_directory()
     audit('model_review','current')
     return {'manifest':json.loads((root/'manifest.json').read_text()),'history':json.loads((root/'history.json').read_text())}
+
+
+training_slot=BoundedSemaphore(1)
+
+class TrainingRequest(BaseModel):
+    architecture:Literal['small_cnn','resnet18','efficientnet_b0']='small_cnn'
+    epochs:int=Field(default=5,ge=1,le=1000)
+    batch_size:int=Field(default=16,ge=1,le=128)
+    pretrained:bool=False
+
+@app.get('/training/readiness')
+def training_readiness(_:Protected):return training.readiness()
+
+@app.post('/training')
+def start_training(body:TrainingRequest,_:Protected):
+    ready=training.readiness()
+    if not ready['ready']:raise HTTPException(409,ready['reason'])
+    if not training_slot.acquire(blocking=False):raise HTTPException(409,'Another CNN training run is active')
+    if not queue_slots.acquire(blocking=False):
+        training_slot.release();raise HTTPException(429,'Research queue is full')
+    id=str(uuid4());params=body.model_dump()
+    try:
+        with Session() as s:s.add(Run(id=id,kind='training',parameters=params,status='pending',result={}));s.commit()
+        def worker():
+            try:
+                def work(run_id):
+                    from .services.ml import train
+                    metadata,images=training.source_paths()
+                    def progress(epoch):
+                        with Session() as s:
+                            item=s.get(Run,run_id);item.result={'epoch':epoch['epoch'],'total_epochs':body.epochs,'latest':epoch};s.commit()
+                    manifest=train(metadata,images,training.artifact_dir(run_id),name=body.architecture,epochs=body.epochs,batch_size=body.batch_size,pretrained=body.pretrained,progress_callback=progress)
+                    return {'manifest':manifest,'history':json.loads((training.artifact_dir(run_id)/'history.json').read_text()),'training_run_id':run_id}
+                execute('training',params,work,run_id=id)
+            except HTTPException:pass  # execute persists and exposes failure; never convert to success.
+            finally:training_slot.release();queue_slots.release()
+        executor.submit(worker)
+    except Exception:
+        training_slot.release();queue_slots.release();raise
+    audit('training_submitted',id)
+    return {'id':id,'status':'pending'}
+
+@app.post('/models/select/{id}')
+def select_model(id:str,_:Protected):
+    with Session() as s:item=s.get(Run,id)
+    if item is None:raise HTTPException(404,'Training run not found')
+    if item.kind!='training' or item.status!='completed':raise HTTPException(409,'Select only a completed training run after reviewing its evaluation')
+    if os.getenv('DERMA_MODEL_DIR'):raise HTTPException(409,'DERMA_MODEL_DIR overrides selection; remove that setting before selecting through the UI')
+    try:result=training.select_artifact(item.id)
+    except (ValueError,OSError,KeyError,RuntimeError) as e:raise HTTPException(409,'Artifact validation failed: '+str(e)) from e
+    audit('research_model_selected',id);return result

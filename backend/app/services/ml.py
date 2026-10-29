@@ -53,7 +53,7 @@ class Lesions(Dataset):
         with Image.open(path) as im: image=ImageOps.exif_transpose(im).convert('RGB'); tensor=self.transform(image)
         return tensor,self.labels.index(str(row.label))
 
-def train(metadata,images,output,name='small_cnn',epochs=5,batch_size=16,seed=42,pretrained=False):
+def train(metadata,images,output,name='small_cnn',epochs=5,batch_size=16,seed=42,pretrained=False,progress_callback=None):
     if not 1<=epochs<=1000 or not 1<=batch_size<=128: raise ValueError('Invalid epochs/batch size')
     torch.manual_seed(seed); np.random.seed(seed); torch.use_deterministic_algorithms(True)
     df=pd.read_csv(metadata,dtype={'label':str,'group_id':str}); train_ix,val_ix,test_ix=split_metadata(df,seed)
@@ -73,17 +73,18 @@ def train(metadata,images,output,name='small_cnn',epochs=5,batch_size=16,seed=42
     for epoch in range(epochs):
         totals=[]
         for phase,loader in enumerate(loaders[:2]):
-            model.train(phase==0); loss_sum=0.; correct=0; n=0
+            model.train(phase==0); loss_sum=0.; loss_weight=0.; correct=0; n=0
             with torch.set_grad_enabled(phase==0):
                 for x,y in loader:
                     logits=model(x); loss=loss_fn(logits,y)
                     if phase==0: optimizer.zero_grad(); loss.backward(); optimizer.step()
-                    loss_sum+=loss.item()*len(y); correct+=(logits.argmax(1)==y).sum().item(); n+=len(y)
-            totals.append({'loss':loss_sum/n,'accuracy':correct/n})
+                    batch_weight=float(weights[y].sum()); loss_sum+=loss.item()*batch_weight; loss_weight+=batch_weight; correct+=(logits.argmax(1)==y).sum().item(); n+=len(y)
+            totals.append({'loss':loss_sum/loss_weight,'accuracy':correct/n})
         history.append({'epoch':epoch+1,'train':totals[0],'validation':totals[1]})
         if totals[1]['loss']<best:
             best=totals[1]['loss']; torch.save(model.state_dict(),output/'weights.pt')
-        (output/'history.json').write_text(json.dumps(history,indent=2))
+        temporary=output/'history.tmp'; temporary.write_text(json.dumps(history,indent=2)); temporary.replace(output/'history.json')
+        if progress_callback: progress_callback(history[-1])
     model.load_state_dict(torch.load(output/'weights.pt',weights_only=True)); model.eval(); truth=[]; scores=[]; embeddings=[]
     head=model.fc if name=='resnet18' else model.classifier[1] if name=='efficientnet_b0' else model[-1]
     handle=head.register_forward_pre_hook(lambda module,args:embeddings.extend(args[0].detach().cpu().tolist()))

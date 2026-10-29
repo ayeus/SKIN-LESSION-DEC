@@ -1,4 +1,5 @@
 "use client";
+import TrainingPanel from "./components/training-panel";
 import { useEffect, useState, FormEvent } from "react";
 import {
   Activity,
@@ -994,7 +995,7 @@ export default function Home() {
                         <input
                           type="file"
                           name="file"
-                          accept=".csv,.xlsx"
+                          accept=".csv,.xlsx,.json"
                           required
                         />
                       </label>
@@ -1322,60 +1323,11 @@ export default function Home() {
                 </section>
               )}
               {page === "training" && (
-                <section className="panel">
-                  <span className="badge">CLI pipeline implemented</span>
-                  <h2>Train on genuine labeled images</h2>
-                  <button
-                    onClick={async () => {
-                      try {
-                        setResult(await api("/models/current"));
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
-                  >
-                    Review configured model artifacts
-                  </button>
-                  <p>
-                    No lesion model has been trained. Compare architectures
-                    using validation results, then evaluate independent test
-                    groups.
-                  </p>
-                  <ol className="steps">
-                    <li>
-                      Review license; place images in an ignored local
-                      directory.
-                    </li>
-                    <li>
-                      Create CSV columns <code>image_path,label,group_id</code>;
-                      minimum five independent groups per class.
-                    </li>
-                    <li>
-                      Document patient vs lesion grouping. Duplicate bytes
-                      across groups are rejected.
-                    </li>
-                    <li>
-                      Train and review history, manifest, confusion matrix and
-                      held-out metrics.
-                    </li>
-                    <li>
-                      Configure DERMA_MODEL_DIR only after artifact review.
-                    </li>
-                  </ol>
-                  <pre>
-                    python -m scripts.train --metadata
-                    data/raw/lesions/metadata.csv --images
-                    data/raw/lesions/images --output artifacts/experiment-01
-                    --architecture small_cnn --epochs 5
-                  </pre>
-                  <p className="notice">
-                    Architectures: small_cnn, resnet18, efficientnet_b0.
-                    ImageNet download requires --pretrained. CPU supported.
-                    Grad-CAM uses actual activations/gradients when requested
-                    during inference. Web training orchestration and external
-                    clinical validation are not implemented yet.
-                  </p>
-                </section>
+                <TrainingPanel
+                  api={api}
+                  onResult={setResult}
+                  onChange={() => void refresh()}
+                />
               )}
               {["reports", "visualization"].includes(page) && (
                 <section className="panel">

@@ -73,3 +73,11 @@ Set nonempty POSTGRES_PASSWORD and DERMA_API_TOKEN in `.env`. Use a URI-safe pas
 ## Operations and limits
 
 Run a single API worker for the in-process bounded queue (two running/four outstanding tabular jobs). Restart marks interrupted jobs failed; it does not retry silently. CLI training writes history after each epoch. Storage includes sensitive research results even with de-identification: restrict filesystem permissions and retain only as approved. Back up database and raw/processed directories together. Production requires institutional controls, users/RBAC, TLS, encrypted storage, resource quotas and a durable queue.
+
+## Web CNN experiments
+
+The training page now checks `/training/readiness` and submits real background jobs with architecture/epochs/batch size. Default manifest is `data/raw/isic2018-task3/metadata.csv`, images under `data/raw/isic2018-task3/images/`. Override server paths with DERMA_LESION_METADATA and DERMA_LESION_IMAGES; paths cannot be supplied by browser clients. Images must finish downloading and be extracted by `scripts.prepare_isic` before training can start.
+
+One CNN experiment may run at a time. Epoch progress appears in the UI and persists in run metadata; history writes are atomic. Navigating away does not cancel training; inspect Reports to recover the run. Restart marks interrupted work failed. Completed experiments live under storage/models/<run-id>. Review actual validation/test artifacts before pressing Select this reviewed research artifact. That writes a local model pointer; no automatic selection occurs. DERMA_MODEL_DIR explicitly overrides selection and must be removed to use the browser selector. All scores remain research-only and uncalibrated.
+
+To verify PostgreSQL independently: `.venv/bin/python -m scripts.check_postgres`. It creates a uniquely named disposable postgres:17-alpine container, runs migrations plus API/FHIR/training tests, and removes the container in finally. It does not touch existing databases. A working Docker engine is required.
