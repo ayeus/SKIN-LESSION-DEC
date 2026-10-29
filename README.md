@@ -4,7 +4,7 @@ A working local research workspace for biomedical image processing, CNN experime
 
 ## Current state
 
-Real FastAPI/SQLAlchemy services, integrated Next.js UI, persistent runs/audits, immutable imports, real image algorithms, SIFT/RANSAC, group-aware CNN CLI, actual Grad-CAM, EHR transformations, TF-IDF/BM25/contextual sense ranking, forecasting, historical indicators, PCA/t-SNE and observational regression diagnostics. No healthcare observations or lesion-trained model are included. Dataset-dependent completion and clinical validation remain blocked.
+Real FastAPI/SQLAlchemy services, integrated Next.js UI, persistent runs/audits, immutable imports, real image algorithms, SIFT/RANSAC, group-aware CNN CLI, actual Grad-CAM, EHR transformations, TF-IDF/BM25/contextual sense ranking, forecasting, historical indicators, PCA/t-SNE and observational regression diagnostics. Public MIMIC-IV demo EHR and NHANES adult research data have been acquired locally and exercised; data files remain excluded from Git. ISIC2018 labels/groups are validated and image acquisition is underway. No lesion-trained model is installed. See [acquisition evidence](docs/DATA_ACQUISITION.md). Dataset-dependent completion and clinical validation remain blocked.
 
 - [Run locally and execute workflows](docs/RUNNING.md)
 - [Required owner inputs](docs/USER_ACTION_REQUIRED.md)

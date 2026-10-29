@@ -27,3 +27,7 @@
 - `.venv/bin/python -m pytest backend/tests -q`: **37 passed**, 32.69s, fresh locked environment. Warnings: upstream Starlette/AnyIO deprecated BlockingPortal alias and joblib physical-core detection fallback. Neither warning was suppressed. No real dataset/model is installed by tests.
 - Final `npm run build`: passed after queued jobs, artifact charts, structured NER/sense output and frontend tests were added. `npm run typecheck` passed separately. `npm run test`: **6 passed**.
 - Temporary local preview/API processes were stopped after HTTP checks. No browser screenshot or PostgreSQL claim is made.
+
+## Real public-data acquisition verification
+See DATA_ACQUISITION.md for executed commands, source licenses, publisher checksum matches, real EHR relationship/date checks and real held-out NHANES metrics. Initial download failed a Content-Length check because HTTP content encoding changed the body length; fixed by requesting identity encoding and comparing length only on unencoded responses. Failure was reported, not suppressed. Re-run succeeded. No raw patient rows or healthcare files committed.
+- After adding public-data preparation: `.venv/bin/python -m pytest backend/tests -q`: **38 passed**, 3.53s. New isolated sentinel-code test confirms censored/unknown NHANES values are not treated as actual numeric behaviors; under-20 participants are excluded. Upstream Starlette/AnyIO deprecation warning remains visible. Real-data verification scripts also executed successfully as documented separately.

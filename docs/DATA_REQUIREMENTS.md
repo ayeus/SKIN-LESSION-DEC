@@ -1,3 +1,7 @@
+# Latest data checkpoint
+
+Public MIMIC-IV demo EHR and NHANES adult data have now been acquired and exercised. ISIC2018 labels/groups validated; image archive downloading; CNN training not performed. See [DATA_ACQUISITION.md](DATA_ACQUISITION.md). Earlier no-data statements below describe the initial implementation checkpoint, not current acquisition status.
+
 # Dataset requirements and provenance
 
 No real dataset is currently installed or approved. Each import requires source URL/citation, license, owner attestation and modality. Raw data remains separate from transformed output. An attestation is not automated de-identification.

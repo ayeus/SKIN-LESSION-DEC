@@ -1,3 +1,7 @@
+# Latest data checkpoint
+
+Public MIMIC-IV demo EHR and NHANES adult data have now been acquired and exercised. ISIC2018 labels/groups validated; image archive downloading; CNN training not performed. See [DATA_ACQUISITION.md](DATA_ACQUISITION.md). Earlier no-data statements below describe the initial implementation checkpoint, not current acquisition status.
+
 # Implementation status
 
 **INCOMPLETE — real-data evaluation and clinical validation blocked.** No genuine lesion model is installed and no healthcare observations have been fabricated.
