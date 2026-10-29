@@ -10,17 +10,17 @@
 ## Implemented and tested
 - Authenticated local research API, immutable imports, run/audit metadata, SQLAlchemy and migrations, separate filesystem artifacts.
 - Classical image enhancement/restoration/normalization, segmentation/contours, compression and metrics, SIFT/RANSAC, actual failure reporting.
-- CNN CLI **and web training**: dataset preflight, one active training run, persistent job/epoch progress, actual checkpoints/curves/embeddings, explicit artifact selection after review, checksum/preprocessing checks and ephemeral inference/Grad-CAM. No automatic promotion or placeholder classifier.
+- CNN CLI **and web training**: dataset preflight, one active training run, persistent job/epoch progress, actual checkpoints/curves/embeddings, explicit artifact selection after review, checksum/preprocessing checks and ephemeral inference/Grad-CAM, downloadable actual result reports and opt-in score/hash retention without image storage. No automatic promotion or placeholder classifier.
 - CSV/XLSX and strict de-identified FHIR R4 collection subset; linked Patient/Encounter/Observation/Condition validation. Unsupported/identifying fields rejected before raw persistence. Not full FHIR conformance.
-- Reproducible tabular cleaning, quality/missingness, exact deduplication, near-duplicate review, explicit conversions and imputation.
+- Reproducible tabular cleaning, quality/missingness, exact deduplication, near-duplicate review, explicit conversions and imputation. Read-only paginated/filterable dataset explorer and explicit many-to-one EHR relationship inspection; repeated encounters preserved.
 - Genuine-label TF-IDF classifier, clustering, BM25/TF-IDF retrieval and contextual sense ranking; licensed local clinical NER adapter.
 - Daily demand baselines/temporal validation, explicit capacity scenarios, historical indicators, PCA/t-SNE and observational modeling/diagnostics/sensitivity.
 - Integrated Next.js workspace, result charts, report inspection/export, honest missing-input states.
 
 ## Current verification
-- **48 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
-- **14 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. This verifies DB-backed API integration, not the complete Compose deployment.
-- **6 frontend component tests**, TypeScript check and production build pass. Additional training component coverage in progress.
+- **51 backend tests** pass in locked Python environment, including actual synthetic training/API selection/inference and FHIR rejection/privacy tests. Synthetic artifacts remain in isolated test storage.
+- **17 tests pass against disposable PostgreSQL**, after actual Alembic migration; container removed. This verifies DB-backed API integration, not the complete Compose deployment.
+- **9 frontend component tests**, TypeScript check and production build pass. Training component coverage includes missing inputs, measured terminal job results, failure display and no automatic model selection.
 - Native Chrome navigation available, but application web content absent from accessibility tree and screenshot returned black. Browser flow/visual/viewport verification remains NOT VERIFIED; HTTP/component/build checks do not substitute.
 
 ## Remaining implementation and validation
@@ -29,6 +29,6 @@
 - Distributed durable task queue; current bounded in-process jobs mark interrupted work failed on restart. One API worker only.
 - Genuine clinical notes/labels/gold entities/relevance judgments and licensed clinical model validation; genuine hospital demand and explicit operational staffing policies.
 - Advanced staffing optimization, calibrated multi-step intervals, complex-survey/causal inference. Optional UMAP/SHAP/transformers not claimed implemented.
-- Full FHIR interoperability, broader relationship UI, complete browser/accessibility/responsive review and full Compose verification.
+- Full FHIR interoperability, complete browser/accessibility/responsive review and full Compose verification.
 
 No tutorial is declared fully complete. See coverage matrix, acquisition evidence and verification record.

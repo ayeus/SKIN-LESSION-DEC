@@ -51,3 +51,32 @@ def test_training_progress_artifact_selection_and_real_inference(monkeypatch,tmp
             assert set(output.json()['scores'])=={'a','b'}
     finally:
         pointer.unlink(missing_ok=True)  # Isolated test storage only.
+
+def test_inference_retention_requires_explicit_opt_in(monkeypatch,tmp_path):
+    """Reuse a test-only completed artifact produced by a real synthetic training test."""
+    import json
+    from backend.app.db import ROOT
+    candidates=[p.parent for p in (ROOT/'models').glob('*/manifest.json')]
+    if not candidates:
+        # Test stands alone: train a tiny explicit synthetic artifact, never install it.
+        from backend.app.services.ml import train
+        images=tmp_path/'images';images.mkdir();rows=[]
+        for label in ['a','b']:
+            for i in range(10):
+                name=f'{label}-{i}.png';pixels=np.random.default_rng(i+(100 if label=='b' else 0)).integers(0,256,(32,32,3),dtype=np.uint8);Image.fromarray(pixels).save(images/name);rows.append({'image_path':name,'label':label,'group_id':name})
+        metadata=tmp_path/'m.csv';pd.DataFrame(rows).to_csv(metadata,index=False);artifact=tmp_path/'artifact';train(metadata,images,artifact,epochs=1,batch_size=4)
+    else:artifact=candidates[0]
+    monkeypatch.setenv('DERMA_MODEL_DIR',str(artifact))
+    import io
+    image=io.BytesIO();Image.fromarray(np.full((32,32,3),128,np.uint8)).save(image,format='PNG')
+    with TestClient(app) as client:
+        before=[r for r in client.get('/runs',headers=H).json() if r['kind']=='inference']
+        files={'file':('synthetic.png',image.getvalue(),'image/png')}
+        transient=client.post('/inference',headers=H,files=files)
+        assert transient.status_code==200 and 'saved_run_id' not in transient.json()
+        after=[r for r in client.get('/runs',headers=H).json() if r['kind']=='inference'];assert len(before)==len(after)
+        saved=client.post('/inference',headers=H,files=files,data={'retain':'true','explain':'true'})
+        assert saved.status_code==200,saved.text
+        report=client.get('/runs/'+saved.json()['saved_run_id'],headers=H).json()['result']
+        assert report['scores']==saved.json()['scores'] and len(report['input_rgb_sha256'])==64
+        assert 'explanation' not in report and 'data:image' not in json.dumps(report)

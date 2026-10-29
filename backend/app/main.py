@@ -191,17 +191,24 @@ async def registration(_:Protected,first:UploadFile=File(...),second:UploadFile=
     return execute('registration',{},lambda id:images.register(a,b))
 
 @app.post('/inference')
-async def inference(_:Protected,file:UploadFile=File(...),explain:bool=Form(False)):
+async def inference(_:Protected,file:UploadFile=File(...),explain:bool=Form(False),retain:bool=Form(False)):
     model=training.selected_directory()
     if not model: raise HTTPException(409,'No trained lesion model configured. Supply validated dataset, train and set DERMA_MODEL_DIR.')
     try: rgb=images.decode(await upload_bytes(file))
     except ValueError as e: raise HTTPException(422,str(e)) from e
     from .services.ml import predict,gradcam
-    # Inference image and scores are not persisted; explicit retention workflow is not yet supported.
+    # Image bytes are never retained here. Scores are stored only with explicit opt-in.
     audit('inference_requested','ephemeral')
     try:
         result=predict(rgb,Path(model))
+        result['input_rgb_sha256']=hashlib.sha256(rgb.tobytes()).hexdigest()
+        result['input_shape']=list(rgb.shape)
         if explain: result['explanation']=gradcam(rgb,Path(model))
+        result['retention']='Scores and model/input hashes saved; image bytes and Grad-CAM image not retained' if retain else 'Ephemeral; no scores or image bytes retained'
+        if retain:
+            persisted={key:value for key,value in result.items() if key!='explanation'}
+            saved=execute('inference',{'retain_scores':True,'retain_image':False},lambda id:persisted)
+            result['saved_run_id']=saved['id']
         return result
     except (OSError,ValueError,KeyError,RuntimeError) as e: raise HTTPException(409,'Model artifact cannot be used: '+str(e)) from e
 
@@ -286,3 +293,35 @@ def select_model(id:str,_:Protected):
     try:result=training.select_artifact(item.id)
     except (ValueError,OSError,KeyError,RuntimeError) as e:raise HTTPException(409,'Artifact validation failed: '+str(e)) from e
     audit('research_model_selected',id);return result
+
+@app.get('/datasets/{id}/rows')
+def dataset_rows(id:str,_:Protected,offset:int=0,limit:int=25,column:str|None=None,value:str|None=None,match:Literal['equals','contains']='equals'):
+    if offset<0 or not 1<=limit<=100:raise HTTPException(422,'Use nonnegative offset and limit between 1 and 100')
+    dataset=get_dataset(id);frame=tabular.read_table(Path(dataset.path))
+    if column:
+        if column not in frame or value is None:raise HTTPException(422,'Filter requires an existing column and a value')
+        series=frame[column]
+        if match=='contains':
+            mask=series.astype('string').str.contains(value,case=False,regex=False,na=False)
+        elif __import__('pandas').api.types.is_numeric_dtype(series):
+            try: number=float(value)
+            except ValueError as error:raise HTTPException(422,'Numeric column requires a numeric filter value') from error
+            if not __import__('math').isfinite(number):raise HTTPException(422,'Filter must be finite')
+            mask=series.eq(number)
+        else:mask=series.astype('string').eq(value).fillna(False)
+        frame=frame.loc[mask]
+    audit('dataset_filtered_read',id)
+    return {'offset':offset,'limit':limit,'matched_rows':len(frame),'columns':list(frame.columns),'rows':tabular.clean_json(frame.iloc[offset:offset+limit].to_dict('records'))}
+
+class RelationshipRequest(BaseModel):
+    child_dataset_id:str
+    parent_dataset_id:str
+    child_key:str
+    parent_key:str
+
+@app.post('/relationships')
+def relationship(body:RelationshipRequest,_:Protected):
+    from .services.relationships import inspect
+    child=get_dataset(body.child_dataset_id);parent=get_dataset(body.parent_dataset_id)
+    if child.modality!='ehr' or parent.modality!='ehr':raise HTTPException(422,'Relationship inspection requires authorized EHR tables')
+    return execute('relationship',body.model_dump(),lambda id:inspect(tabular.read_table(Path(child.path)),tabular.read_table(Path(parent.path)),body.child_key,body.parent_key),child.id)

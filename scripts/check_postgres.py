@@ -21,7 +21,7 @@ def check():
         env['DATABASE_URL']=f"postgresql+psycopg2://derma:{env['POSTGRES_PASSWORD']}@127.0.0.1:{port}/dermatest"
         env['DERMA_STORAGE']='/private/tmp/'+name
         subprocess.run([sys.executable,'-m','alembic','-c','backend/alembic.ini','upgrade','head'],env=env,check=True)
-        subprocess.run([sys.executable,'-m','pytest','backend/tests/test_api.py','backend/tests/test_fhir.py','backend/tests/test_training_api.py','-q'],env=env,check=True)
+        subprocess.run([sys.executable,'-m','pytest','backend/tests/test_api.py','backend/tests/test_fhir.py','backend/tests/test_training_api.py','backend/tests/test_relationships.py','-q'],env=env,check=True)
         print('Disposable PostgreSQL migrations and API/FHIR/training tests passed; container will be removed.',flush=True)
     finally:
         if started:subprocess.run(['docker','stop','--time','5',name],check=True,capture_output=True)

@@ -67,9 +67,7 @@ it("requires authorized files and provenance to import data", async () => {
 });
 it("shows missing operational inputs instead of fabricated demand", async () => {
   const user = await unlock();
-  await user.click(
-    screen.getByRole("button", { name: "Patient demand" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Patient demand" }));
   expect(screen.getByText("Waiting for a compatible dataset")).toBeVisible();
   expect(screen.getByText(/28 complete daily observations/)).toBeVisible();
   expect(

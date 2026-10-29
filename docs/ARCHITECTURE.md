@@ -15,3 +15,5 @@ flowchart LR
 ```
 
 Schema: datasets, runs, audit_events. Runs distinguish imports, transformations, image processing, registrations, inference, training, evaluation, text analytics, forecasting, research and reports. Domain-specific payloads are JSON with explicit run type; dedicated production user/encounter tables and multi-user RBAC remain future work. Do not import identifiable data into this local research version.
+
+Web CNN jobs use configured server-side source paths, bounded execution and persisted epoch progress; complete artifacts live in storage/models/<run-id>. Explicit selection writes an atomic local pointer only after checksum/preprocessing validation. FHIR imports validate a strict research subset before saving raw bytes. Dataset browsing is read-only; explicit relationships validate keys without rewriting source tables. Inference score retention is opt-in, with no raw-image/Grad-CAM server persistence.

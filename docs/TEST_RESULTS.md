@@ -38,3 +38,12 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - `.venv/bin/python -m scripts.check_postgres`: **14 passed**, 4.38s, against fresh PostgreSQL 17 after Alembic migration. Disposable container removed. No production data used.
 - `npm run typecheck`, `npm run test` (**6 passed**) and `npm run build`: passed. Build exposed ambiguous workspace-root inference due to an unrelated untracked root package-lock; explicit frontend root configuration pending.
 - Native Chrome access now permits navigation to local app. Returned screenshot was entirely black and accessibility tree omitted application web content after refresh. Functional/visual browser verification remains incomplete; no screenshot saved as UI evidence.
+
+## Dataset explorer and inference-report retention
+- `.venv/bin/python -m pytest backend/tests -q`: **51 passed**, 3.58s. Added authentication, pagination bounds, numeric equality and literal (non-regex) text filtering; parent-key validation, orphan reporting and encounter preservation. Retention test verifies ephemeral inference does not create a score record, explicit opt-in persists actual scores/hashes, and stored reports exclude image/heatmap bytes.
+- Real MIMIC relationship service execution: 275/275 child admissions matched 100/100 supplied parent patients, no missing/unmatched keys; repeated encounters retained. Report persisted in actual local run history.
+- Frontend training component tests: source unavailability disables submission; terminal job results are reviewed without automatic model selection; real API-style failure messages remain failures. All fixtures are isolated component tests.
+- Next.js now explicitly resolves Turbopack root to the frontend directory, using the installed version's documented root option. Unrelated untracked root package-lock was left untouched.
+- Live Next.js `/api/status` proxy returned actual persisted registry counts: four datasets (three EHR, one weight), two completed runs at time of request, zero image runs and no available lesion model. This verifies HTTP/API integration, not rendered browser interaction.
+- Final cross-database rerun: `.venv/bin/python -m scripts.check_postgres`: **17 passed**, 3.93s. Includes relationship and opt-in inference-retention cases; disposable container removed.
+- Final frontend `npm run typecheck`, `npm run test` (**9 passed**, 1.91s), `npm run build`: passed without workspace-root warning after explicit configuration.

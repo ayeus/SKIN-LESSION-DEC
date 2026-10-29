@@ -81,3 +81,9 @@ The training page now checks `/training/readiness` and submits real background j
 One CNN experiment may run at a time. Epoch progress appears in the UI and persists in run metadata; history writes are atomic. Navigating away does not cancel training; inspect Reports to recover the run. Restart marks interrupted work failed. Completed experiments live under storage/models/<run-id>. Review actual validation/test artifacts before pressing Select this reviewed research artifact. That writes a local model pointer; no automatic selection occurs. DERMA_MODEL_DIR explicitly overrides selection and must be removed to use the browser selector. All scores remain research-only and uncalibrated.
 
 To verify PostgreSQL independently: `.venv/bin/python -m scripts.check_postgres`. It creates a uniquely named disposable postgres:17-alpine container, runs migrations plus API/FHIR/training tests, and removes the container in finally. It does not touch existing databases. A working Docker engine is required.
+
+## Read-only dataset explorer and relationships
+
+In EHR & dataset management, select an imported dataset, choose an optional exact-value or literal-text filter and read a paginated table (25 rows per page; API allows at most 100). The source is never changed. For two EHR tables, expand relationship inspection, choose child/parent datasets and map foreign/primary keys explicitly. Parent keys must be unique/nonmissing; unmatched and missing child keys are reported; repeated encounters are retained. No hidden key coercion or identity inference occurs. Relationship reports persist in history.
+
+Inference defaults to no score/image retention. Download research prediction report exports actual ephemeral output locally. The optional Save research scores checkbox persists only scores, model/input hashes and measured input shape. Image and Grad-CAM pixels are excluded from the saved server report. Retained score reports can be reviewed/exported through Reports.

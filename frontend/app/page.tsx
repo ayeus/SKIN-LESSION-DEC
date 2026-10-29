@@ -1,5 +1,6 @@
 "use client";
 import TrainingPanel from "./components/training-panel";
+import DatasetExplorer from "./components/dataset-explorer";
 import { useEffect, useState, FormEvent } from "react";
 import {
   Activity,
@@ -123,7 +124,13 @@ function Chart({ data, keys }: { data: any[]; keys: string[] }) {
     </div>
   );
 }
-function Results({ value }: { value: Result }) {
+function Results({
+  value,
+  onSelectModel,
+}: {
+  value: Result;
+  onSelectModel?: (id: string) => void;
+}) {
   const r = value.result || value;
   return (
     <section className="panel">
@@ -363,6 +370,40 @@ function Results({ value }: { value: Result }) {
             {k}: {Number(v).toFixed(4)}
           </p>
         ))}
+      {r.scores && (
+        <button
+          onClick={() => {
+            const url = URL.createObjectURL(
+              new Blob(
+                [
+                  JSON.stringify(
+                    {
+                      generated_at: new Date().toISOString(),
+                      research_only: true,
+                      result: r,
+                    },
+                    null,
+                    2,
+                  ),
+                ],
+                { type: "application/json" },
+              ),
+            );
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "research-prediction.json";
+            link.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          Download research prediction report
+        </button>
+      )}
+      {r.training_run_id && r.manifest && onSelectModel && (
+        <button onClick={() => onSelectModel(r.training_run_id)}>
+          Select this reviewed research model
+        </button>
+      )}
       <details>
         <summary>Structured metrics, parameters and report</summary>
         <pre>
@@ -956,13 +997,20 @@ export default function Home() {
                         {page === "registration"
                           ? "SIFT finds local structure; RANSAC estimates geometry. Neither diagnoses cancer. Unsuitable image pairs fail explicitly."
                           : page === "inference"
-                            ? "Uncalibrated research scores, never confirmed diagnoses. Image and prediction are not retained."
+                            ? "Uncalibrated research scores, never confirmed diagnoses. Image bytes are not retained; score retention requires explicit opt-in."
                             : "Generated images and parameters are retained in local run history. Original pixels and generated results are retained; original encoded files and EXIF are not retained. Masks require clinical validation."}
                       </p>
                       {page === "inference" && (
                         <label className="check-label">
                           <input name="explain" type="checkbox" value="true" />
                           Compute actual Grad-CAM explanation
+                        </label>
+                      )}
+                      {page === "inference" && (
+                        <label className="check-label">
+                          <input type="checkbox" name="retain" value="true" />
+                          Save research scores and model/input hashes in local
+                          history. Uploaded image and heatmap are not stored.
                         </label>
                       )}
                       <button className="primary" disabled={busy}>
@@ -1086,6 +1134,11 @@ export default function Home() {
                       </p>
                     )}
                   </section>
+                  <DatasetExplorer
+                    datasets={datasets}
+                    api={api}
+                    onResult={setResult}
+                  />
                 </>
               )}
               {[
@@ -1442,7 +1495,17 @@ export default function Home() {
               )}
               {result && (
                 <>
-                  <Results value={result} />
+                  <Results
+                    value={result}
+                    onSelectModel={async (id) => {
+                      try {
+                        await api("/models/select/" + id, { method: "POST" });
+                        void refresh();
+                      } catch (e) {
+                        setError((e as Error).message);
+                      }
+                    }}
+                  />
                   {result.id && result.status === "completed" && (
                     <button onClick={() => void exportRun(result.id)}>
                       Export report
