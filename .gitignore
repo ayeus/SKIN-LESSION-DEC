@@ -12,3 +12,5 @@ coverage/
 test-results/
 
 *.tsbuildinfo
+
+playwright-report/

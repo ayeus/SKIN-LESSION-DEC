@@ -76,7 +76,7 @@ Run a single API worker for the in-process bounded queue (two running/four outst
 
 ## Web CNN experiments
 
-The training page now checks `/training/readiness` and submits real background jobs with architecture/epochs/batch size. Default manifest is `data/raw/isic2018-task3/metadata.csv`, images under `data/raw/isic2018-task3/images/`. Override server paths with DERMA_LESION_METADATA and DERMA_LESION_IMAGES; paths cannot be supplied by browser clients. Images must finish downloading and be extracted by `scripts.prepare_isic` before training can start.
+The training page checks `/training/readiness` and submits real background jobs with architecture/epochs/batch size. Default manifest is `data/raw/isic2018-task3/metadata.csv`, images under `data/raw/isic2018-task3/images/`. Override server paths with DERMA_LESION_METADATA and DERMA_LESION_IMAGES; paths cannot be supplied by browser clients. The official image archive is already acquired and content-audited in this local workspace. For the presentation workflow and selected artifacts, see [LOCAL_DEMO.md](LOCAL_DEMO.md).
 
 One CNN experiment may run at a time. Epoch progress appears in the UI and persists in run metadata; history writes are atomic. Navigating away does not cancel training; inspect Reports to recover the run. Restart marks interrupted work failed. Completed experiments live under storage/models/<run-id>. Review actual validation/test artifacts before pressing Select this reviewed research artifact. That writes a local model pointer; no automatic selection occurs. DERMA_MODEL_DIR explicitly overrides selection and must be removed to use the browser selector. All scores remain research-only and uncalibrated.
 

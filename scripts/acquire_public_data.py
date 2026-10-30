@@ -66,7 +66,7 @@ def acquire(url, destination, license, source, expected=None):
             transferred = 0
             milestone = 0
             with part.open("ab" if append else "wb") as output:
-                for chunk in response.iter_content(1024 * 1024):
+                for chunk in response.raw.stream(1024 * 1024, decode_content=False):
                     output.write(chunk)
                     transferred += len(chunk)
                     if offset + transferred > 12 * 1024**3:
@@ -82,11 +82,7 @@ def acquire(url, destination, license, source, expected=None):
                             ),
                             flush=True,
                         )
-            if (
-                total
-                and not response.headers.get("Content-Encoding")
-                and transferred != total
-            ):
+            if total and transferred != total:
                 raise ValueError("Incomplete download")
         part.rename(destination)
     with destination.open("rb") as stream:

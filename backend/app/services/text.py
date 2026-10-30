@@ -2,7 +2,6 @@ import re
 import math
 from collections import Counter
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split, GroupShuffleSplit
@@ -14,19 +13,38 @@ def tokens(s):
     return re.findall(r"\b\w+\b", s.lower())
 
 
-def documents(df, p):
+from .text_preprocessing import (
+    linguistic_texts,
+    vectorizer as make_vectorizer,
+    stop_words,
+    description,
+)
+
+
+def documents(df, p, minimum=3, preserve_source=False):
     col = p.get("text_column", "text")
     if col not in df or df[col].isna().any():
         raise ValueError("Map a nonmissing text column")
-    docs = df[col].astype(str).map(lambda s: re.sub(r"\s+", " ", s).strip()).tolist()
-    if len(docs) < 3 or any(not x for x in docs):
-        raise ValueError("At least three nonempty documents required")
+    docs = df[col].astype(str).tolist()
+    if not preserve_source:
+        docs = [re.sub(r"\s+", " ", value).strip() for value in docs]
+    if len(docs) < minimum or any(not x.strip() for x in docs):
+        raise ValueError(
+            f"At least {minimum} nonempty document(s) required for this task"
+        )
     return docs
 
 
 def analyze(df, p):
-    docs = documents(df, p)
     task = p.get("task", "cluster")
+    docs = documents(
+        df,
+        p,
+        minimum=1 if task in {"ner", "search"} else 3,
+        preserve_source=task == "ner",
+    )
+    if task != "ner":
+        docs = linguistic_texts(docs, p)
     if task in ("classify", "disambiguate"):
         label = p.get("label_column", "label")
         if label not in df or df[label].isna().any():
@@ -52,7 +70,7 @@ def analyze(df, p):
                 "Training split lacks a class; provide more independent groups"
             )
         model = make_pipeline(
-            TfidfVectorizer(max_features=10000, ngram_range=(1, 2)),
+            make_vectorizer(p),
             LogisticRegression(max_iter=1000, random_state=42),
         )
         model.fit([docs[i] for i in train], y.iloc[train])
@@ -64,6 +82,7 @@ def analyze(df, p):
                 raise ValueError(
                     "Provide the ambiguous term within its actual clinical context as query"
                 )
+            query = linguistic_texts([query], p)[0]
             probabilities = model.predict_proba([query])[0]
             contextual = {
                 "sense_candidates": sorted(
@@ -78,17 +97,27 @@ def analyze(df, p):
         return {
             **contextual,
             "method": "TF-IDF + logistic regression",
+            "text_preprocessing": description(p),
             "evaluation": classification_report(
                 y.iloc[test], pred, output_dict=True, zero_division=0
             ),
             "test_indices": test.tolist(),
             "predicted_labels": pred.tolist(),
+            "test_predictions": [
+                {
+                    "document_index": int(index),
+                    "text": docs[index],
+                    "observed_label": str(y.iloc[index]),
+                    "predicted_label": str(prediction),
+                }
+                for index, prediction in zip(test, pred)
+            ],
             "train_rows": len(train),
             "limitation": "Held-out research baseline. Without patient grouping repeated-note leakage cannot be excluded.",
         }
     if task == "ner":
         return clinical_entities(docs)
-    vectorizer = TfidfVectorizer(max_features=10000, ngram_range=(1, 2))
+    vectorizer = make_vectorizer(p)
     x = vectorizer.fit_transform(docs)
     if task == "cluster":
         k = int(p.get("clusters", 2))
@@ -118,6 +147,7 @@ def analyze(df, p):
         }
         return {
             "assignments": labels.tolist(),
+            "text_preprocessing": description(p),
             "top_terms": top,
             "silhouette_cosine": float(silhouette_score(x, labels, metric="cosine")),
             "limitation": "Clusters are exploratory document groups, not validated diagnoses.",
@@ -126,14 +156,20 @@ def analyze(df, p):
         query = p.get("query", "").strip()
         if not query:
             raise ValueError("Provide search query")
+        query = linguistic_texts([query], p)[0]
         algorithm = p.get("method", "bm25")
         if algorithm == "tfidf":
             scores = (x @ vectorizer.transform([query]).T).toarray().ravel()
         elif algorithm == "bm25":
-            corpus = [tokens(s) for s in docs]
+            excluded = set(stop_words(p) or [])
+            corpus = [
+                [word for word in tokens(s) if word not in excluded] for s in docs
+            ]
             avg = np.mean([len(s) for s in corpus])
             scores = np.zeros(len(docs))
-            for term in set(tokens(query)):
+            if avg <= 0:
+                raise ValueError("No tokens remain after configured preprocessing")
+            for term in set(tokens(query)) - excluded:
                 freq = sum(term in s for s in corpus)
                 idf = math.log(1 + (len(docs) - freq + 0.5) / (freq + 0.5))
                 for i, doc in enumerate(corpus):
@@ -151,14 +187,13 @@ def analyze(df, p):
         return {
             "method": algorithm,
             "results": ranking,
+            "text_preprocessing": description(p),
             "explanation": "Scores indicate lexical relevance, not clinical truth. BM25 uses k1=1.5, b=0.75.",
             "disambiguation": {
                 "status": "unresolved",
                 "reason": "No context-labeled terminology model supplied. Ambiguous abbreviations remain unresolved.",
             },
         }
-    if task == "ner":
-        return clinical_entities(docs)
     raise ValueError("Unsupported text task")
 
 
@@ -191,7 +226,9 @@ def clinical_entities(docs):
         entities = []
         for ent in doc.ents:
             negation = (
-                getattr(ent._, "negex", None) if ent.has_extension("negex") else None
+                getattr(ent._, "negex", None)
+                if "negex" in nlp.pipe_names and ent.has_extension("negex")
+                else None
             )
             entities.append(
                 {

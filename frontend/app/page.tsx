@@ -1,4 +1,10 @@
 "use client";
+import PlanningEvidence from "./components/planning-evidence";
+import SegmentationEvidence from "./components/segmentation-evidence";
+import TerminologyPanel from "./components/terminology-panel";
+import SenseEvidence from "./components/sense-evidence";
+import EntityDocument from "./components/entity-document";
+import TrainingHistory from "./components/training-history";
 import ClinicalModelPanel from "./components/clinical-model-panel";
 import TrainingPanel from "./components/training-panel";
 import EmbeddingView from "./components/embedding-view";
@@ -39,6 +45,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  Legend,
 } from "recharts";
 type Result = Record<string, any>;
 type Dataset = {
@@ -102,37 +109,98 @@ const descriptions: Record<string, string> = {
   settings: "Understand what is available and what is missing.",
 };
 function Chart({ data, keys }: { data: any[]; keys: string[] }) {
+  const [offset, setOffset] = useState(0);
+  const begin = Math.min(
+    offset,
+    Math.max(0, Math.floor((data.length - 1) / 25) * 25),
+  );
+  const label = data[0]?.date ? "date" : "index";
+  const display = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value)
+      ? new Intl.NumberFormat(undefined, {
+          maximumSignificantDigits: 6,
+        }).format(value)
+      : value == null
+        ? "Not recorded"
+        : String(value);
   return (
-    <div className="chart">
-      <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis
-            dataKey={data[0]?.date ? "date" : "index"}
-            tick={{ fontSize: 11 }}
-          />
-          <YAxis />
-          <Tooltip />
-          {keys.map((k, i) => (
-            <Line
-              key={k}
-              dataKey={k}
-              stroke={["#087f83", "#bd6b37", "#6879b6"][i % 3]}
-              dot={false}
-              strokeWidth={2}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+    <div>
+      <div className="chart">
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey={label} tick={{ fontSize: 11 }} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            {keys.map((key, index) => (
+              <Line
+                key={key}
+                dataKey={key}
+                stroke={["#087f83", "#bd6b37", "#6879b6"][index % 3]}
+                dot={false}
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <details>
+        <summary>View chart data</summary>
+        <div className="table-wrap">
+          <table>
+            <caption>Actual values plotted in this chart</caption>
+            <thead>
+              <tr>
+                <th>{data[0]?.[label] == null ? "Series row" : label}</th>
+                {keys.map((key) => (
+                  <th key={key}>{key}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.slice(begin, begin + 25).map((row, index) => (
+                <tr key={begin + index}>
+                  <td>{display(row[label] ?? begin + index + 1)}</td>
+                  {keys.map((key) => (
+                    <td key={key}>{display(row[key])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Rows {data.length ? begin + 1 : 0}–{Math.min(begin + 25, data.length)}{" "}
+          of {data.length}
+        </p>
+        <button
+          type="button"
+          disabled={begin === 0}
+          onClick={() => setOffset(Math.max(0, begin - 25))}
+        >
+          Previous chart rows
+        </button>{" "}
+        <button
+          type="button"
+          disabled={begin + 25 >= data.length}
+          onClick={() => setOffset(begin + 25)}
+        >
+          Next chart rows
+        </button>
+      </details>
     </div>
   );
 }
-function Results({
+export function Results({
   value,
   onSelectModel,
+  onSelectSegmentation,
 }: {
   value: Result;
   onSelectModel?: (id: string) => void;
+  onSelectSegmentation?: (id: string) => void;
 }) {
   const r = value.result || value;
   return (
@@ -203,23 +271,18 @@ function Results({
         </>
       )}
       <ForecastEvidence result={r} Chart={Chart} />
+      <SenseEvidence result={r} />
+      <PlanningEvidence result={r} />
+      <SegmentationEvidence manifest={r.manifest} />
       {r.monthly_trend && <Chart data={r.monthly_trend} keys={["count"]} />}
-      {r.history && (
-        <>
-          <h3>Training and validation loss</h3>
-          <Chart
-            data={r.history.map((h: any) => ({
-              index: h.epoch,
-              train_loss: h.train.loss,
-              validation_loss: h.validation.loss,
-            }))}
-            keys={["train_loss", "validation_loss"]}
-          />
-        </>
-      )}
+      {r.history && <TrainingHistory history={r.history} Chart={Chart} />}
       {r.manifest?.evaluation?.confusion_matrix && (
         <>
-          <h3>Held-out confusion matrix</h3>
+          <h3>
+            {r.manifest.test_evaluated === false
+              ? "Validation-only candidate confusion matrix"
+              : "Held-out test confusion matrix"}
+          </h3>
           <div className="table-wrap">
             <table>
               <thead>
@@ -275,16 +338,7 @@ function Results({
         r.documents.map((d: any, i: number) => (
           <article key={i}>
             <h3>Document {i}</h3>
-            <p>{d.text}</p>
-            <ul>
-              {d.entities.map((e: any, j: number) => (
-                <li key={j}>
-                  <mark>{e.text}</mark> {e.label} (characters {e.start}–{e.end}
-                  ); negation:{" "}
-                  {e.negated === null ? "unknown" : String(e.negated)}
-                </li>
-              ))}
-            </ul>
+            <EntityDocument text={d.text} entities={d.entities} />
           </article>
         ))}
       {Object.entries(
@@ -356,6 +410,14 @@ function Results({
           </figcaption>
         </figure>
       )}
+      {r.research_prediction && (
+        <div className="notice" role="status">
+          Research model top-ranked label: <strong>{r.research_prediction}</strong>
+          <br />
+          This is an uncalibrated research output, not a diagnosis or a measure
+          of clinical confidence.
+        </div>
+      )}
       {r.scores &&
         Object.entries(r.scores).map(([k, v]) => (
           <p key={k}>
@@ -391,9 +453,19 @@ function Results({
           Download research prediction report
         </button>
       )}
-      {r.training_run_id && r.manifest && onSelectModel && (
-        <button onClick={() => onSelectModel(r.training_run_id)}>
-          Select this reviewed research model
+      {r.training_run_id &&
+        r.manifest &&
+        r.manifest.test_evaluated !== false &&
+        onSelectModel && (
+          <button onClick={() => onSelectModel(r.training_run_id)}>
+            Select this reviewed research model
+          </button>
+        )}
+      {r.segmentation_training_run_id && r.manifest && onSelectSegmentation && (
+        <button
+          onClick={() => onSelectSegmentation(r.segmentation_training_run_id)}
+        >
+          Select reviewed segmentation model
         </button>
       )}
       <details>
@@ -476,7 +548,29 @@ export default function Home() {
   useEffect(() => {
     if (token) void refresh();
   }, [token]);
+  useEffect(() => {
+    function restoreModule() {
+      const id = window.location.hash.slice(1);
+      if (modules.some((module) => module.id === id)) {
+        setPage(id);
+        setResult(null);
+        setError("");
+        setParameters("{}");
+        setMobile(false);
+        setSelected("");
+      }
+    }
+    restoreModule();
+    window.addEventListener("popstate", restoreModule);
+    window.addEventListener("hashchange", restoreModule);
+    return () => {
+      window.removeEventListener("popstate", restoreModule);
+      window.removeEventListener("hashchange", restoreModule);
+    };
+  }, []);
   function navigate(id: string) {
+    if (window.location.hash !== `#${id}`)
+      window.history.pushState(null, "", `#${id}`);
     setPage(id);
     setResult(null);
     setError("");
@@ -531,6 +625,8 @@ export default function Home() {
           p.date_column = fd.get("date_column");
           p.count_column = fd.get("count_column");
           p.horizon = Number(fd.get("horizon"));
+          if (type === "planning" && fd.get("scenarios"))
+            p.scenarios = JSON.parse(String(fd.get("scenarios")));
           if (fd.get("capacity"))
             p.patients_per_staff_per_shift = Number(fd.get("capacity"));
           if (fd.get("shift_fractions"))
@@ -550,16 +646,11 @@ export default function Home() {
             p.dimensions = Number(fd.get("dimensions"));
           } else p.target = fd.get("target");
         }
-        output = await api(
-          "/analyze/" +
-            (type === "planning" ? "forecast" : type) +
-            "?background=true",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dataset_id: selected, parameters: p }),
-          },
-        );
+        output = await api("/analyze/" + type + "?background=true", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataset_id: selected, parameters: p }),
+        });
       }
       if (output.status === "pending") {
         while (output.status === "pending" || output.status === "running") {
@@ -611,8 +702,28 @@ export default function Home() {
   );
   return (
     <div className="shell">
-      <aside className={mobile ? "sidebar open" : "sidebar"}>
-        <a className="brand" href="#" onClick={() => navigate("dashboard")}>
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+      <aside
+        id="research-navigation"
+        className={mobile ? "sidebar open" : "sidebar"}
+      >
+        <a
+          className="brand"
+          href="#dashboard"
+          onClick={(event) => {
+            if (
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.shiftKey &&
+              !event.altKey
+            ) {
+              event.preventDefault();
+              navigate("dashboard");
+            }
+          }}
+        >
           <span className="brand-icon">
             <Activity size={27} />
           </span>
@@ -638,15 +749,26 @@ export default function Home() {
                         : "Workspace"}
                 </div>
               )}
-              <button
+              <a
+                href={`#${m.id}`}
                 aria-current={page === m.id ? "page" : undefined}
                 className={page === m.id ? "nav-item active" : "nav-item"}
-                onClick={() => navigate(m.id)}
+                onClick={(event) => {
+                  if (
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    event.preventDefault();
+                    navigate(m.id);
+                  }
+                }}
               >
                 <m.icon size={17} />
                 {m.name}
                 {page === m.id && <ChevronRight size={14} />}
-              </button>
+              </a>
             </div>
           ))}
         </nav>
@@ -657,11 +779,13 @@ export default function Home() {
           </div>
         </div>
       </aside>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <header className="topbar">
           <button
             className="icon-button mobile-toggle"
             aria-label="Toggle navigation"
+            aria-expanded={mobile}
+            aria-controls="research-navigation"
             onClick={() => setMobile(!mobile)}
           >
             <Menu />
@@ -878,7 +1002,17 @@ export default function Home() {
                         <button
                           key={m.id}
                           className="pathway"
-                          onClick={() => navigate(m.id)}
+                          onClick={(event) => {
+                            if (
+                              !event.metaKey &&
+                              !event.ctrlKey &&
+                              !event.shiftKey &&
+                              !event.altKey
+                            ) {
+                              event.preventDefault();
+                              navigate(m.id);
+                            }
+                          }}
                         >
                           <span className="pathway-icon">
                             <m.icon size={22} />
@@ -999,6 +1133,7 @@ export default function Home() {
                                 "equalize",
                                 "gamma",
                                 "gray_world",
+                                "learned_segmentation",
                                 "gaussian",
                                 "median",
                                 "bilateral",
@@ -1012,7 +1147,18 @@ export default function Home() {
                                 "png",
                                 "webp",
                               ].map((m) => (
-                                <option key={m}>{m}</option>
+                                <option
+                                  key={m}
+                                  value={m}
+                                  disabled={
+                                    m === "learned_segmentation" &&
+                                    !status?.segmentation_model_available
+                                  }
+                                >
+                                  {m === "learned_segmentation"
+                                    ? "Learned segmentation (reviewed model required)"
+                                    : m}
+                                </option>
                               ))}
                             </select>
                           </label>
@@ -1399,6 +1545,21 @@ export default function Home() {
                           )}
                         </div>
                       )}
+                      {page === "planning" && (
+                        <label>
+                          Named planning scenarios (optional JSON array)
+                          <textarea name="scenarios" defaultValue="[]" />
+                          <small>
+                            Each object requires name and
+                            patients_per_staff_per_shift. Per-shift analysis
+                            also requires shift_arrival_fractions and
+                            shift_hours. Optional available_staff_per_shift and
+                            minimum_staff_per_shift must be whole-number arrays
+                            matching the shifts. Supply your actual assumptions;
+                            no policy values are inferred.
+                          </small>
+                        </label>
+                      )}
                       <label>
                         Advanced parameters (JSON)
                         <textarea
@@ -1450,6 +1611,9 @@ export default function Home() {
                     </form>
                   )}
                 </section>
+              )}
+              {page === "text" && (
+                <TerminologyPanel api={api} onResult={setResult} />
               )}
               {page === "text" && (
                 <ClinicalModelPanel
@@ -1632,6 +1796,20 @@ export default function Home() {
                 <>
                   <Results
                     value={result}
+                    onSelectSegmentation={
+                      status?.access?.role === "admin"
+                        ? async (id) => {
+                            try {
+                              await api("/segmentation-models/select/" + id, {
+                                method: "POST",
+                              });
+                              void refresh();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            }
+                          }
+                        : undefined
+                    }
                     onSelectModel={async (id) => {
                       try {
                         await api("/models/select/" + id, { method: "POST" });

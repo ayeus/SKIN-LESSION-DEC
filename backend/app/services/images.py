@@ -104,11 +104,31 @@ def process(rgb, method, p):
     elif method == "gray_world":
         means = rgb.mean(axis=(0, 1))
         out = np.clip(rgb * means.mean() / np.maximum(means, 1), 0, 255).astype("uint8")
-    elif method in ("threshold", "otsu", "edges", "morphology", "grabcut"):
+    elif method in (
+        "threshold",
+        "otsu",
+        "edges",
+        "morphology",
+        "grabcut",
+        "learned_segmentation",
+    ):
         threshold = int(p.get("threshold", 128))
         if not 0 <= threshold <= 255:
             raise ValueError("threshold must be in [0,255]")
-        if method == "edges":
+        learned_details = {}
+        if method == "learned_segmentation":
+            if p:
+                raise ValueError(
+                    "Learned segmentation uses versioned preprocessing and a validation-selected operating point; clear classical parameters"
+                )
+            try:
+                from .segmentation_model import predict_mask
+            except ImportError as error:
+                raise ValueError(
+                    "BLOCKED: install the full CPU/ML runtime for learned segmentation"
+                ) from error
+            mask, learned_details = predict_mask(rgb)
+        elif method == "edges":
             mask = cv2.Canny(gray, 50, 150)
         elif method == "grabcut":
             h, w = gray.shape
@@ -143,6 +163,7 @@ def process(rgb, method, p):
         metrics = {
             "foreground_fraction": float((mask > 0).mean()),
             "contour_count": len(contours),
+            **learned_details,
         }
     elif method in ("jpeg", "png", "webp"):
         quality = int(p.get("quality", 80))
@@ -183,7 +204,7 @@ def process(rgb, method, p):
         "histogram": hist,
         "parameters": p,
         "method": method,
-        "limitation": "Classical image processing is not a validated lesion diagnosis. Compression may remove diagnostically relevant detail.",
+        "limitation": "Computed image processing and segmentation outputs are research results, not validated lesion diagnoses. Compression may remove diagnostically relevant detail.",
     }
 
 

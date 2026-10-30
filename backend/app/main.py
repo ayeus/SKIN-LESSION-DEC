@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import socket
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -31,18 +32,59 @@ logger = logging.getLogger("dermainsight")
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="research-job")
 queue_slots = BoundedSemaphore(4)
 
+API_ACTIVE = False
+EXECUTOR_INSTANCE = str(uuid4())
+
+
+def execution_parameters(parameters):
+    return {
+        **parameters,
+        "_execution": {
+            "kind": "api" if API_ACTIVE else "cli",
+            "instance": EXECUTOR_INSTANCE,
+            "pid": os.getpid(),
+            "host": socket.gethostname(),
+        },
+    }
+
+
+def known_dead_api_job(run):
+    owner = (run.parameters or {}).get("_execution", {})
+    if (
+        not isinstance(owner, dict)
+        or owner.get("kind") != "api"
+        or owner.get("host") != socket.gethostname()
+    ):
+        return False
+    pid = owner.get("pid")
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    return False
+
 
 @asynccontextmanager
 async def lifespan(app):
+    global API_ACTIVE
     # Migrations own schema creation. Local opt-in only, production uses alembic upgrade head.
     if os.getenv("DERMA_DEV_CREATE_SCHEMA") == "1":
         Base.metadata.create_all(engine)
     with Session() as s:
         for run in s.scalars(select(Run).where(Run.status.in_(["pending", "running"]))):
-            run.status = "failed"
-            run.error = "Process interrupted; rerun explicitly"
+            if known_dead_api_job(run):
+                run.status = "failed"
+                run.error = "Owning API process ended; rerun explicitly. External CLI and unknown jobs are never assumed interrupted."
         s.commit()
-    yield
+    API_ACTIVE = True
+    try:
+        yield
+    finally:
+        API_ACTIVE = False
 
 
 app = FastAPI(title="DermaInsight AI Research API", version="0.1.0", lifespan=lifespan)
@@ -53,7 +95,7 @@ app.include_router(auth_router)
 @app.exception_handler(RequestValidationError)
 async def validation_error(request, error):
     # Preserve validation locations/messages, never echo submitted password/token values.
-    if request.url.path.startswith("/auth/"):
+    if request.url.path.startswith(("/auth/", "/terminology/")):
         return JSONResponse(
             status_code=422,
             content={
@@ -108,6 +150,7 @@ def execute(kind, parameters, fn, dataset_id=None, run_id=None, owner_id=None):
         if run_id:
             run = s.get(Run, id)
             run.status = "running"
+            run.parameters = execution_parameters(parameters)
         else:
             s.add(
                 Run(
@@ -115,7 +158,7 @@ def execute(kind, parameters, fn, dataset_id=None, run_id=None, owner_id=None):
                     kind=kind,
                     dataset_id=dataset_id,
                     owner_id=owner_id,
-                    parameters=parameters,
+                    parameters=execution_parameters(parameters),
                     status="running",
                     result={},
                 )
@@ -170,10 +213,44 @@ def model_ready():
     try:
         from .services.ml import load_artifact
 
-        load_artifact(Path(directory))
-        return True
+        _, manifest = load_artifact(Path(directory))
+        return manifest.get("test_evaluated") is not False
     except (OSError, ValueError, KeyError, RuntimeError, ImportError):
         return False
+
+
+def segmentation_ready():
+    if (
+        not os.getenv("DERMA_SEGMENTATION_MODEL")
+        and not (ROOT / "segmentation-model-selection.json").is_file()
+    ):
+        return False
+    try:
+        from .services.segmentation_model import selected_directory, load_artifact
+
+        root = selected_directory()
+        if root is None:
+            return False
+        load_artifact(root)
+        return True
+    except (ValueError, OSError, KeyError, RuntimeError, ImportError):
+        return False
+
+
+def clinical_model_status():
+    from .clinical_training import selected_directory, validate_model
+    import importlib.util
+
+    try:
+        root = selected_directory()
+        if root is None:
+            return "BLOCKED: no licensed clinical model selected/configured"
+        validate_model(root)
+        if importlib.util.find_spec("spacy") is None:
+            return "BLOCKED: clinical runtime unavailable; install the full CPU/NLP environment"
+        return "Configured; research-only, measured validation and limitations must be reviewed"
+    except (ValueError, OSError, KeyError):
+        return "BLOCKED: clinical artifact validation failed"
 
 
 @app.get("/status")
@@ -193,14 +270,13 @@ def status(_: Protected):
             __import__("collections").Counter(d.modality for d in datasets)
         ),
         "model_available": model_ready(),
+        "segmentation_model_available": segmentation_ready(),
         "lesion_source": training.acquisition_state()
         if _.role == "admin"
         else {"scope": "Administrator-managed source"},
         "access": {"role": _.role, "username": _.username},
         "clinical_validation": "Not established",
-        "ner": "Configured; research-only, validation must be reviewed"
-        if os.getenv("DERMA_NER_MODEL")
-        else "BLOCKED: licensed clinical model not configured",
+        "ner": clinical_model_status(),
     }
 
 
@@ -299,7 +375,9 @@ class Operation(BaseModel):
 
 @app.post("/analyze/{kind}")
 def analyze(
-    kind: Literal["preprocess", "forecast", "research", "reduce", "text", "overview"],
+    kind: Literal[
+        "preprocess", "forecast", "planning", "research", "reduce", "text", "overview"
+    ],
     body: Operation,
     _: Protected,
     background: bool = False,
@@ -311,6 +389,7 @@ def analyze(
     allowed = {
         "preprocess": {"ehr", "tabular", "weight"},
         "forecast": {"demand"},
+        "planning": {"demand"},
         "research": {"weight", "tabular"},
         "reduce": {"ehr", "weight", "tabular"},
         "text": {"clinical_text"},
@@ -328,6 +407,10 @@ def analyze(
             return result
         if kind == "forecast":
             return analytics.forecast(df, p)
+        if kind == "planning":
+            from .services.planning import plan
+
+            return plan(df, p)
         if kind == "research":
             return analytics.research(df, p)
         if kind == "reduce":
@@ -363,7 +446,7 @@ def analyze(
                     kind=kind,
                     dataset_id=dataset.id,
                     owner_id=_.id,
-                    parameters=p,
+                    parameters=execution_parameters(p),
                     status="pending",
                     result={},
                 )
@@ -594,7 +677,7 @@ def start_training(body: TrainingRequest, _: Protected):
                     id=id,
                     kind="training",
                     owner_id=_.id,
-                    parameters=params,
+                    parameters=execution_parameters(params),
                     status="pending",
                     result={},
                 )
@@ -868,3 +951,85 @@ def select_clinical_model(id: str, _: Protected):
         ) from error
     audit("clinical_model_selected", item.id, _.id)
     return selected
+
+
+class TermRequest(BaseModel):
+    term: str = Field(min_length=1, max_length=200)
+    context: str = Field(min_length=5, max_length=10000)
+    retain: bool = False
+
+
+@app.get("/terminology/status")
+def terminology_status(_: Protected):
+    from .services.terminology import inventory_path, read_inventory
+
+    path = inventory_path()
+    if not path.is_file():
+        return {
+            "available": False,
+            "reason": "Acquire and prepare the versioned public MeSH inventory; no fallback medical mapping is used",
+        }
+    try:
+        stat = path.stat()
+        data, digest = read_inventory(
+            str(path.resolve()), stat.st_mtime_ns, stat.st_size
+        )
+        return {
+            "available": True,
+            "metadata": data["metadata"],
+            "descriptor_records": len(data["records"]),
+            "inventory_sha256": digest,
+        }
+    except (ValueError, OSError, KeyError) as error:
+        raise HTTPException(
+            409, "Terminology inventory validation failed: " + str(error)
+        ) from error
+
+
+@app.post("/terminology/disambiguate")
+def rank_terminology(body: TermRequest, _: Protected):
+    from .services.terminology import contextual_candidates
+
+    if body.retain:
+        require_write(_)
+        return execute(
+            "terminology",
+            body.model_dump(),
+            lambda rid: contextual_candidates(body.term, body.context),
+            owner_id=_.id,
+        )
+    try:
+        return {
+            "result": contextual_candidates(body.term, body.context),
+            "retained": False,
+        }
+    except (ValueError, OSError, KeyError) as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.post("/segmentation-models/select/{id}")
+def select_segmentation_model(id: str, _: Protected):
+    require_admin(_)
+    if os.getenv("DERMA_SEGMENTATION_MODEL"):
+        raise HTTPException(
+            409,
+            "DERMA_SEGMENTATION_MODEL overrides UI selection; remove the override first",
+        )
+    with Session() as session:
+        item = session.get(Run, id)
+    if item is None:
+        raise HTTPException(404, "Segmentation training run not found")
+    if item.kind != "segmentation_training" or item.status != "completed":
+        raise HTTPException(
+            409, "Review a completed segmentation training run before selection"
+        )
+    try:
+        from .services.segmentation_model import select_artifact
+
+        result = select_artifact(item.id)
+    except (ValueError, OSError, KeyError, RuntimeError, ImportError) as error:
+        raise HTTPException(
+            409, "Segmentation artifact validation failed: " + str(error)
+        ) from error
+    audit("segmentation_model_selected", item.id, _.id)
+    return result

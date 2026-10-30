@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Home from "../app/page";
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -48,7 +49,7 @@ it("requires access before rendering data and never persists the token", () => {
 it("shows actual zero counts and disables lesion prediction without a model", async () => {
   const user = await unlock();
   expect(screen.getByText("Awaiting model")).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Lesion detection" }));
+  await user.click(screen.getByRole("link", { name: "Lesion detection" }));
   expect(screen.getByText("A trained lesion model is required")).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Run research inference" }),
@@ -57,7 +58,7 @@ it("shows actual zero counts and disables lesion prediction without a model", as
 it("requires authorized files and provenance to import data", async () => {
   const user = await unlock();
   await user.click(
-    screen.getByRole("button", { name: "EHR & dataset management" }),
+    screen.getByRole("link", { name: "EHR & dataset management" }),
   );
   expect(screen.getByLabelText("Dataset file")).toBeRequired();
   expect(screen.getByLabelText("Source URL / citation")).toBeRequired();
@@ -67,7 +68,7 @@ it("requires authorized files and provenance to import data", async () => {
 });
 it("shows missing operational inputs instead of fabricated demand", async () => {
   const user = await unlock();
-  await user.click(screen.getByRole("button", { name: "Patient demand" }));
+  await user.click(screen.getByRole("link", { name: "Patient demand" }));
   expect(screen.getByText("Waiting for a compatible dataset")).toBeVisible();
   expect(screen.getByText(/28 complete daily observations/)).toBeVisible();
   expect(
@@ -76,9 +77,7 @@ it("shows missing operational inputs instead of fabricated demand", async () => 
 });
 it("validates image upload and clears data when workspace is locked", async () => {
   const user = await unlock();
-  await user.click(
-    screen.getByRole("button", { name: "Image processing lab" }),
-  );
+  await user.click(screen.getByRole("link", { name: "Image processing lab" }));
   expect(screen.getByLabelText("Image", { exact: true })).toBeRequired();
   expect(screen.getByLabelText("Image", { exact: true })).toHaveAttribute(
     "accept",

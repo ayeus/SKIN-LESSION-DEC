@@ -74,6 +74,10 @@ def select_artifact(run_id):
     from .services.ml import load_artifact
 
     _, manifest = load_artifact(artifact_dir(run_id))
+    if manifest.get("test_evaluated") is False:
+        raise ValueError(
+            "Validation-only candidate cannot be selected; freeze experiment choice and evaluate its held-out test first"
+        )
     path = ROOT / "model-selection.json"
     temporary = path.with_suffix(".tmp")
     temporary.write_text(

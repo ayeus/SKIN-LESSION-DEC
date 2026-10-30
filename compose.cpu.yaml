@@ -1,0 +1,12 @@
+# Apply after compose.yaml to enable the fully locked optional CPU runtime.
+services:
+  migrate:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.cpu
+  api:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.cpu

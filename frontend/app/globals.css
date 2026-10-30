@@ -1,7 +1,7 @@
 :root {
   --ink: #193c46;
-  --muted: #617681;
-  --teal: #087f83;
+  --muted: #536975;
+  --teal: #076f73;
   --line: #dce6e9;
   --bg: #f4f8fa;
   --nav: #173b46;
@@ -362,7 +362,7 @@ main {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  color: #4f8e94;
+  color: #32636b;
   min-width: 230px;
   border-left: 1px solid #bfd8db;
   margin-left: 30px;
@@ -663,7 +663,7 @@ footer {
   justify-content: center;
   gap: 8px;
   font-size: 10px;
-  color: #6a818b;
+  color: var(--muted);
   margin: 32px 0 5px;
 }
 footer svg {
@@ -784,4 +784,39 @@ footer svg {
   text-decoration: underline;
   font-weight: 600;
   margin: 10px 20px 10px 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: #173b46;
+  color: white;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+.nav-item {
+  text-decoration: none;
+  align-items: center;
+}
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+th,
+td,
+.metrics strong {
+  font-variant-numeric: tabular-nums;
+}
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  scroll-margin-top: 85px;
 }

@@ -61,10 +61,14 @@ def prepare(root=Path("data/raw/isic2018-task3")):
                     raise ValueError("Oversized encoded image")
                 destination = images / name
                 if not destination.exists():
-                    with archive.open(item) as src, destination.open("wb") as dst:
+                    temporary = destination.with_suffix(".extracting")
+                    with archive.open(item) as src, temporary.open("wb") as dst:
                         import shutil
 
                         shutil.copyfileobj(src, dst)
+                    if temporary.stat().st_size != item.file_size:
+                        raise ValueError("Extracted image length mismatch")
+                    temporary.replace(destination)
             if seen != allowed:
                 raise ValueError("Archive does not match image manifest")
     metadata.to_csv(root / "metadata.csv", index=False)

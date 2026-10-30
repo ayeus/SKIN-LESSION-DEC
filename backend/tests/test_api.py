@@ -207,3 +207,61 @@ def test_three_dimensional_analysis_persists_actual_coordinates_and_source():
         exported = client.get(f"/runs/{run['id']}/export/json", headers=H)
         assert exported.status_code == 200
         assert exported.json()["coordinates"] == run["result"]["coordinates"]
+
+
+def test_planning_route_uses_explicit_scenarios_and_never_invents_staff_availability():
+    """Constant mathematical count fixture, not hospital observations."""
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        {
+            "date": pd.date_range("2020-01-01", periods=28).strftime("%Y-%m-%d"),
+            "count": [8] * 28,
+        }
+    )
+    with TestClient(app) as client:
+        imported = client.post(
+            "/datasets",
+            headers=H,
+            data={
+                "modality": "demand",
+                "source": "Explicit synthetic mathematical test",
+                "license": "isolated test only",
+                "authorized": "true",
+            },
+            files={
+                "file": (
+                    "synthetic-counts.csv",
+                    frame.to_csv(index=False).encode(),
+                    "text/csv",
+                )
+            },
+        )
+        assert imported.status_code == 200, imported.text
+        response = client.post(
+            "/analyze/planning",
+            headers=H,
+            json={
+                "dataset_id": imported.json()["id"],
+                "parameters": {
+                    "horizon": 2,
+                    "scenarios": [
+                        {"name": "test assumption", "patients_per_staff_per_shift": 4}
+                    ],
+                },
+            },
+        )
+        assert response.status_code == 200, response.text
+        result = response.json()["result"]
+        assert len(result["forecast"]) == 2
+        assert result["planning_scenarios"][0]["required_staff_shifts_per_day"] == [
+            2,
+            2,
+        ]
+        assert (
+            result["planning_scenarios"][0]["summary"][
+                "maximum_shift_workload_shortfall"
+            ]
+            is None
+        )
+        assert result["dataset_provenance"]["id"] == imported.json()["id"]

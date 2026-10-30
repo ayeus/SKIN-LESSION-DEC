@@ -1,13 +1,18 @@
-# Public dataset acquisition checkpoint — 2026-10-29
+# Public dataset acquisition and evaluation — 2026-10-30
 
 Owner authorized selecting suitable public sources and reported no existing approved datasets. Sources are kept separate by modality; datasets are never combined merely to increase size.
 
 ## Lesion classification
 Selected official ISIC 2018 Task 3 training resources (HAM10000), CC-BY-NC 4.0 with contributor attribution. Official source https://challenge.isic-archive.com/data/ . Harvard Dataverse API returned HTTP 403/anti-bot challenge; no bypass attempted. Official ISIC S3 downloads are accessible.
 
-Downloaded and validated labels and lesion groupings: 10,015 images, 7,470 lesion groups, seven actual class columns. Group-disjoint split check yielded 6,004 training / 1,997 validation / 2,014 test rows. These are **metadata checks**, not trained-model results. Lesion groups do not establish patient-disjointness. HAM10000 overlaps other ISIC releases; pooling them without overlap audits would invalidate independence.
+Downloaded and validated labels and lesion groupings: 10,015 images, 7,470 lesion groups, seven actual class columns. Full byte/pixel audit decoded all 10,015 images and found no invalid images or exact cross-group pixel duplicates. Group-disjoint split yielded 6,004 training / 1,997 validation / 2,014 test rows. The groups are lesions and do not establish patient-disjointness. HAM10000 overlaps other ISIC releases; pooling them without overlap audits would invalidate independence.
 
-The original image transfer timed out with an incomplete archive. A resumed HTTP Range/If-Range transfer is in progress at this checkpoint (2,771,732,744 expected bytes from the official resource HEAD). Cached source files are reused only when their receipt URL and local SHA match. No complete archive/extracted image set, CNN training or lesion inference is claimed. Download supports partial-file resumption and records local SHA-256 after completion; that hash is not a publisher checksum unless explicitly provided.
+The original transfer timed out with an incomplete archive. A resumed HTTP Range/If-Range transfer completed and passed archive/extraction integrity checks. Cached source files are reused only when their receipt URL and local SHA match. Acquisition supports partial-file resumption and records local SHA-256; this hash is not represented as a publisher checksum.
+
+Three actual short-budget models were compared on validation: a small CNN, ResNet18, and an EfficientNet-B0 with frozen ImageNet backbone. EfficientNet-B0 had the lowest class-weighted validation loss and was frozen as the choice before test evaluation. It was then evaluated once on the 2,014-image held-out test split: accuracy 0.62115, balanced accuracy 0.51307, macro F1 0.41722, weighted F1 0.65978. Per-class results show uneven performance. The selected model now runs locally with uncalibrated research scores and actual Grad-CAM. This is not clinical effectiveness evidence; patient-independent, external-site and skin-tone validation remain outstanding. See [IMAGE_EXPERIMENT_PROTOCOL.md](IMAGE_EXPERIMENT_PROTOCOL.md).
+
+## Lesion segmentation
+Official ISIC 2018 Task 1 validation inputs and binary masks were acquired under the source's CC0 terms, with archives and pairs verified. A 50-epoch Tiny U-Net V2 was trained using 70 images, validation-selected using 15 images, and evaluated on 15 held-out images within the 100-image validation cohort. Its mean Dice was 0.89046 and IoU 0.81544 at 256-square model input; threshold 0.75 was selected on validation. The actual artifact was selected and exercised on an uploaded image. The small cohort is image-disjoint only, not patient-independent; the 256-pixel representation and upsampled output are not a clinical/native-resolution boundary validation. The earlier classical Otsu 100-pair measurements remain a separate benchmark and must not be conflated with this split.
 
 ## EHR
 Selected MIMIC-IV Clinical Database Demo 2.2, https://physionet.org/content/mimic-iv-demo/2.2/ , Johnson et al. (2023), DOI 10.13026/dp1f-ex47. Open Data Commons Open Database License 1.0, retained locally. This is a genuine de-identified public subset, despite its product name 'demo'; it is not synthetic.

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from importlib.metadata import version
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -119,104 +120,27 @@ class Lesions(Dataset):
         return tensor, self.labels.index(str(row.label))
 
 
-def train(
-    metadata,
-    images,
-    output,
-    name="small_cnn",
-    epochs=5,
-    batch_size=16,
-    seed=42,
-    pretrained=False,
-    progress_callback=None,
-):
-    if not 1 <= epochs <= 1000 or not 1 <= batch_size <= 128:
-        raise ValueError("Invalid epochs/batch size")
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    torch.use_deterministic_algorithms(True)
-    df = pd.read_csv(metadata, dtype={"label": str, "group_id": str})
-    train_ix, val_ix, test_ix = split_metadata(df, seed)
-    # Detect identical image bytes across groups before training.
-    hashes = {}
-    for _, row in df.iterrows():
-        path = (images / row.image_path).resolve()
-        if not path.is_relative_to(images.resolve()):
-            raise ValueError("Path traversal in manifest")
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        if digest in hashes and hashes[digest] != row.group_id:
-            raise ValueError("Identical image bytes across different groups")
-        hashes[digest] = row.group_id
-    labels = sorted(df.label.unique())
-    model = architecture(name, len(labels), pretrained)
-    loaders = [
-        DataLoader(
-            Lesions(df.iloc[ix], images, labels, i == 0),
-            batch_size=batch_size,
-            shuffle=i == 0,
-            num_workers=0,
-        )
-        for i, ix in enumerate((train_ix, val_ix, test_ix))
-    ]
-    counts = df.iloc[train_ix].label.value_counts()
-    weights = torch.tensor(
-        [len(train_ix) / (len(labels) * counts[c]) for c in labels], dtype=torch.float32
-    )
-    loss_fn = nn.CrossEntropyLoss(weight=weights)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    output.mkdir(parents=True, exist_ok=False)
-    best = float("inf")
-    history = []
-    for epoch in range(epochs):
-        totals = []
-        for phase, loader in enumerate(loaders[:2]):
-            model.train(phase == 0)
-            loss_sum = 0.0
-            loss_weight = 0.0
-            correct = 0
-            n = 0
-            with torch.set_grad_enabled(phase == 0):
-                for x, y in loader:
-                    logits = model(x)
-                    loss = loss_fn(logits, y)
-                    if phase == 0:
-                        optimizer.zero_grad()
-                        loss.backward()
-                        optimizer.step()
-                    batch_weight = float(weights[y].sum())
-                    loss_sum += loss.item() * batch_weight
-                    loss_weight += batch_weight
-                    correct += (logits.argmax(1) == y).sum().item()
-                    n += len(y)
-            totals.append({"loss": loss_sum / loss_weight, "accuracy": correct / n})
-        history.append(
-            {"epoch": epoch + 1, "train": totals[0], "validation": totals[1]}
-        )
-        if totals[1]["loss"] < best:
-            best = totals[1]["loss"]
-            torch.save(model.state_dict(), output / "weights.pt")
-        temporary = output / "history.tmp"
-        temporary.write_text(json.dumps(history, indent=2))
-        temporary.replace(output / "history.json")
-        if progress_callback:
-            progress_callback(history[-1])
-    model.load_state_dict(torch.load(output / "weights.pt", weights_only=True))
-    model.eval()
-    truth = []
-    scores = []
-    embeddings = []
-    head = (
+def classifier_head(model, name):
+    return (
         model.fc
         if name == "resnet18"
         else model.classifier[1]
         if name == "efficientnet_b0"
         else model[-1]
     )
+
+
+def evaluate(model, name, labels, df, indices, loader, output, partition):
+    model.eval()
+    truth = []
+    scores = []
+    embeddings = []
+    head = classifier_head(model, name)
     handle = head.register_forward_pre_hook(
         lambda module, args: embeddings.extend(args[0].detach().cpu().tolist())
     )
     with torch.no_grad():
-        for x, y in loaders[2]:
+        for x, y in loader:
             truth += y.tolist()
             scores += model(x).softmax(1).tolist()
     handle.remove()
@@ -224,8 +148,8 @@ def train(
         embeddings, columns=[f"feature_{i}" for i in range(len(embeddings[0]))]
     )
     features["label"] = [labels[i] for i in truth]
-    features["group_id"] = df.iloc[test_ix].group_id.to_numpy()
-    features.to_csv(output / "test_embeddings.csv", index=False)
+    features["group_id"] = df.iloc[indices].group_id.to_numpy()
+    features.to_csv(output / f"{partition}_embeddings.csv", index=False)
     scores = np.asarray(scores, dtype=np.float64)
     scores /= scores.sum(axis=1, keepdims=True)
     pred = scores.argmax(1)
@@ -290,10 +214,147 @@ def train(
         curves=curves,
         reliability=reliability,
         expected_calibration_error=ece,
-        calibration_note="Measured on held-out test, 10 fixed-width bins; scores remain uncalibrated.",
+        calibration_note=f"Measured on {partition}, 10 fixed-width bins; scores remain uncalibrated.",
+    )
+    return evaluation
+
+
+def train(
+    metadata,
+    images,
+    output,
+    name="small_cnn",
+    epochs=5,
+    batch_size=16,
+    seed=42,
+    pretrained=False,
+    progress_callback=None,
+    defer_test=False,
+    freeze_backbone=False,
+):
+    if not 1 <= epochs <= 1000 or not 1 <= batch_size <= 128:
+        raise ValueError("Invalid epochs/batch size")
+    training_source_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    torch.use_deterministic_algorithms(True)
+    df = pd.read_csv(metadata, dtype={"label": str, "group_id": str})
+    train_ix, val_ix, test_ix = split_metadata(df, seed)
+    from .image_audit import audit_images
+
+    audit = audit_images(df, images)
+    if not audit["ready"]:
+        raise ValueError(
+            "Image content audit failed: invalid files or identical image pixels/bytes across groups require review"
+        )
+    hashes = {row["encoded_sha256"] for row in audit["image_records"]}
+    labels = sorted(df.label.unique())
+    model = architecture(name, len(labels), pretrained)
+    if freeze_backbone:
+        if name == "small_cnn" or not pretrained:
+            raise ValueError(
+                "Frozen transfer baseline requires a pretrained ResNet/EfficientNet backbone"
+            )
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        for parameter in classifier_head(model, name).parameters():
+            parameter.requires_grad_(True)
+    loaders = [
+        DataLoader(
+            Lesions(df.iloc[ix], images, labels, i == 0),
+            batch_size=batch_size,
+            shuffle=i == 0,
+            num_workers=0,
+        )
+        for i, ix in enumerate((train_ix, val_ix, test_ix))
+    ]
+    counts = df.iloc[train_ix].label.value_counts()
+    weights = torch.tensor(
+        [len(train_ix) / (len(labels) * counts[c]) for c in labels], dtype=torch.float32
+    )
+    loss_fn = nn.CrossEntropyLoss(weight=weights)
+    optimizer = torch.optim.Adam(
+        (p for p in model.parameters() if p.requires_grad), lr=0.001
+    )
+    output.mkdir(parents=True, exist_ok=False)
+    best = float("inf")
+    history = []
+    for epoch in range(epochs):
+        totals = []
+        for phase, loader in enumerate(loaders[:2]):
+            model.train(phase == 0)
+            if freeze_backbone:
+                model.eval()  # keep frozen BatchNorm statistics fixed
+                classifier_head(model, name).train(phase == 0)
+            loss_sum = 0.0
+            loss_weight = 0.0
+            correct = 0
+            n = 0
+            with torch.set_grad_enabled(phase == 0):
+                for x, y in loader:
+                    logits = model(x)
+                    loss = loss_fn(logits, y)
+                    if phase == 0:
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                    batch_weight = float(weights[y].sum())
+                    loss_sum += loss.item() * batch_weight
+                    loss_weight += batch_weight
+                    correct += (logits.argmax(1) == y).sum().item()
+                    n += len(y)
+            totals.append({"loss": loss_sum / loss_weight, "accuracy": correct / n})
+        history.append(
+            {"epoch": epoch + 1, "train": totals[0], "validation": totals[1]}
+        )
+        if totals[1]["loss"] < best:
+            best = totals[1]["loss"]
+            torch.save(model.state_dict(), output / "weights.pt")
+        temporary = output / "history.tmp"
+        temporary.write_text(json.dumps(history, indent=2))
+        temporary.replace(output / "history.json")
+        if progress_callback:
+            progress_callback(history[-1])
+    model.load_state_dict(torch.load(output / "weights.pt", weights_only=True))
+    evaluation_partition = "validation" if defer_test else "test"
+    evaluation = evaluate(
+        model,
+        name,
+        labels,
+        df,
+        val_ix if defer_test else test_ix,
+        loaders[1] if defer_test else loaders[2],
+        output,
+        evaluation_partition,
     )
     manifest = {
         "architecture": name,
+        "training_source_sha256": training_source_sha256,
+        "software_versions": {
+            package: version(package)
+            for package in [
+                "torch",
+                "torchvision",
+                "numpy",
+                "pandas",
+                "scikit-learn",
+                "Pillow",
+            ]
+        },
+        "training_configuration": {
+            "optimizer": "Adam",
+            "learning_rate": 0.001,
+            "loss": "class-weighted cross entropy",
+            "class_weights": {
+                label: float(weights[i]) for i, label in enumerate(labels)
+            },
+            "training_class_counts": {label: int(counts[label]) for label in labels},
+            "cpu_threads": torch.get_num_threads(),
+            "augmentation": {
+                "horizontal_flip_probability": 0.5,
+                "rotation_degrees": 15,
+            },
+        },
         "labels": labels,
         "size": SIZE,
         "mean": MEAN,
@@ -301,6 +362,21 @@ def train(
         "seed": seed,
         "epochs": epochs,
         "pretrained_imagenet": pretrained,
+        "frozen_backbone": freeze_backbone,
+        "evaluation_partition": evaluation_partition,
+        "test_evaluated": not defer_test,
+        "selection_criterion": "Minimum class-weighted validation loss; test is never used for checkpoint selection.",
+        "best_validation_loss": best,
+        "content_audit": {
+            key: value
+            for key, value in audit.items()
+            if key
+            not in {
+                "image_records",
+                "cross_group_encoded_duplicates",
+                "cross_group_decoded_duplicates",
+            }
+        },
         "image_content_sha256": hashlib.sha256(
             "".join(sorted(hashes)).encode()
         ).hexdigest(),
@@ -348,6 +424,10 @@ def load_artifact(root):
 
 def predict(rgb, root):
     model, manifest = load_artifact(root)
+    if manifest.get("test_evaluated") is False:
+        raise ValueError(
+            "Candidate has validation-only evaluation; complete frozen-choice test review before inference"
+        )
     x = preprocessing()(Image.fromarray(rgb)).unsqueeze(0)
     with torch.no_grad():
         scores = model(x).softmax(1)[0].tolist()
@@ -365,6 +445,10 @@ def gradcam(rgb, root):
     import cv2
 
     model, manifest = load_artifact(root)
+    if manifest.get("test_evaluated") is False:
+        raise ValueError(
+            "Validation-only candidate is not ready for inference explanations"
+        )
     layer = (
         model.layer4[-1]
         if manifest["architecture"] == "resnet18"
@@ -412,3 +496,49 @@ def gradcam(rgb, root):
         }
     finally:
         handle.remove()
+
+
+def finalize_test(root, metadata, images):
+    """Evaluate a previously validation-only candidate after experiment choice is frozen."""
+    model, manifest = load_artifact(root)
+    if manifest.get("test_evaluated") is not False:
+        raise ValueError("Independent test was already evaluated for this artifact")
+    if hashlib.sha256(metadata.read_bytes()).hexdigest() != manifest["metadata_sha256"]:
+        raise ValueError("Metadata changed since candidate training")
+    df = pd.read_csv(metadata, dtype={"label": str, "group_id": str})
+    hashes = set()
+    for name in df.image_path:
+        path = (images / name).resolve()
+        if not path.is_relative_to(images.resolve()):
+            raise ValueError("Image path escapes dataset root")
+        hashes.add(hashlib.sha256(path.read_bytes()).hexdigest())
+    if (
+        hashlib.sha256("".join(sorted(hashes)).encode()).hexdigest()
+        != manifest["image_content_sha256"]
+    ):
+        raise ValueError("Image source changed since candidate training")
+    indices = manifest["split_indices"]["test"]
+    loader = DataLoader(
+        Lesions(df.iloc[indices], images, manifest["labels"], False),
+        batch_size=16,
+        shuffle=False,
+        num_workers=0,
+    )
+    result = evaluate(
+        model,
+        manifest["architecture"],
+        manifest["labels"],
+        df,
+        indices,
+        loader,
+        root,
+        "test",
+    )
+    manifest["validation_evaluation"] = manifest["evaluation"]
+    manifest["evaluation"] = result
+    manifest["evaluation_partition"] = "test"
+    manifest["test_evaluated"] = True
+    temporary = root / "manifest.tmp"
+    temporary.write_text(json.dumps(manifest, indent=2))
+    temporary.replace(root / "manifest.json")
+    return manifest

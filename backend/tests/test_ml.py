@@ -90,3 +90,92 @@ def test_actual_training_checkpoint_roundtrip_and_gradcam(tmp_path):
 def test_small_baseline_cannot_claim_imagenet_pretraining():
     with pytest.raises(ValueError, match="no ImageNet weights"):
         architecture("small_cnn", 2, pretrained=True)
+
+
+def test_candidate_defers_test_pixels_until_finalization_and_blocks_promotion(
+    tmp_path, monkeypatch
+):
+    """Isolated synthetic pixels verify protocol access, not model effectiveness."""
+    from backend.app.services.ml import train, finalize_test, Lesions, predict
+    from backend.app import training
+    from backend.app.main import model_ready
+
+    images = tmp_path / "images"
+    images.mkdir()
+    rows = []
+    for label in ["a", "b"]:
+        for i in range(10):
+            name = f"{label}-{i}.png"
+            Image.fromarray(
+                np.random.default_rng(i + (100 if label == "b" else 0)).integers(
+                    0, 256, (24, 24, 3), dtype=np.uint8
+                )
+            ).save(images / name)
+            rows.append({"image_path": name, "label": label, "group_id": name})
+    metadata = tmp_path / "metadata.csv"
+    frame = pd.DataFrame(rows)
+    frame.to_csv(metadata, index=False)
+    output = tmp_path / "candidate"
+    accessed = []
+    original = Lesions.__getitem__
+
+    def record(self, index):
+        accessed.append(self.df.iloc[index].image_path)
+        return original(self, index)
+
+    monkeypatch.setattr(Lesions, "__getitem__", record)
+    manifest = train(metadata, images, output, epochs=1, batch_size=4, defer_test=True)
+    test_paths = set(frame.iloc[manifest["split_indices"]["test"]].image_path)
+    assert not test_paths & set(accessed)
+    assert (
+        manifest["evaluation_partition"] == "validation"
+        and manifest["test_evaluated"] is False
+    )
+    assert (
+        not (output / "test_embeddings.csv").exists()
+        and (output / "validation_embeddings.csv").is_file()
+    )
+    monkeypatch.setenv("DERMA_MODEL_DIR", str(output))
+    assert model_ready() is False
+    with pytest.raises(ValueError, match="validation-only"):
+        predict(np.zeros((24, 24, 3), np.uint8), output)
+    monkeypatch.setattr(training, "artifact_dir", lambda run_id: output)
+    with pytest.raises(ValueError, match="Validation-only"):
+        training.select_artifact("test-only")
+    path = images / next(iter(test_paths))
+    original_bytes = path.read_bytes()
+    path.write_bytes(original_bytes + b"changed")
+    with pytest.raises(ValueError, match="source changed"):
+        finalize_test(output, metadata, images)
+    path.write_bytes(original_bytes)
+    finalized = finalize_test(output, metadata, images)
+    assert (
+        finalized["test_evaluated"] is True
+        and finalized["evaluation_partition"] == "test"
+    )
+    assert test_paths <= set(accessed) and (output / "test_embeddings.csv").is_file()
+    assert model_ready() is True
+    with pytest.raises(ValueError, match="already evaluated"):
+        finalize_test(output, metadata, images)
+
+
+def test_patient_group_can_legitimately_contain_different_lesion_labels():
+    frame = pd.DataFrame(
+        [
+            {
+                "image_path": f"{group}-{label}.png",
+                "group_id": f"patient-{group}",
+                "label": label,
+            }
+            for group in range(10)
+            for label in ["a", "b"]
+        ]
+    )
+    splits = split_metadata(frame)
+    groups = [set(frame.iloc[indices].group_id) for indices in splits]
+    assert all(set(frame.iloc[indices].label) == {"a", "b"} for indices in splits)
+    assert (
+        not groups[0] & groups[1]
+        and not groups[0] & groups[2]
+        and not groups[1] & groups[2]
+    )

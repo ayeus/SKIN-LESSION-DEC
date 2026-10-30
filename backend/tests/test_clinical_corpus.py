@@ -111,6 +111,11 @@ def test_actual_isolated_ner_training_selection_inference_and_checksum(
             )
             assert selected.status_code == 200, selected.text
             assert (
+                client.get("/status", headers=token)
+                .json()["ner"]
+                .startswith("Configured")
+            )
+            assert (
                 client.get("/clinical-models/current", headers=token).json()[
                     "model_card"
                 ]["evaluation"]
@@ -130,3 +135,43 @@ def test_actual_isolated_ner_training_selection_inference_and_checksum(
             clinical_training.validate_model(artifact / "pipeline")
     finally:
         pointer.unlink(missing_ok=True)
+
+
+def test_global_negation_extension_does_not_invent_assertion_from_unconfigured_pipeline(
+    tmp_path, monkeypatch
+):
+    spacy = pytest.importorskip("spacy")
+    from spacy.tokens import Span
+    from backend.app.services.text import analyze
+    import pandas as pd
+
+    model = spacy.blank("en")
+    ner = model.add_pipe("ner")
+    ner.add_label("Sign_symptom")
+    model.initialize()
+    model.add_pipe("entity_ruler", last=True).add_patterns(
+        [{"label": "Sign_symptom", "pattern": "rash"}]
+    )
+    root = tmp_path / "model"
+    model.to_disk(root)
+    (root / "research-model-card.json").write_text(
+        json.dumps(
+            {
+                "source": "explicit synthetic unit fixture",
+                "license": "test only",
+                "intended_use": "isolated algorithm verification",
+                "limitations": "No clinical validation",
+            }
+        )
+    )
+    monkeypatch.setenv("DERMA_NER_MODEL", str(root))
+    added = not Span.has_extension("negex")
+    if added:
+        Span.set_extension("negex", default=False)
+    try:
+        result = analyze(pd.DataFrame({"text": ["rash"]}), {"task": "ner"})
+        assert result["documents"][0]["entities"][0]["text"] == "rash"
+        assert result["documents"][0]["entities"][0]["negated"] is None
+    finally:
+        if added:
+            Span.remove_extension("negex")

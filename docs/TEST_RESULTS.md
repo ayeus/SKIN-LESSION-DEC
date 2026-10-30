@@ -1,5 +1,18 @@
 # Verification record
 
+## Current local demo verification — 2026-10-30
+
+- `.venv/bin/python -m pytest backend/tests -q`: **105 passed**, 11.52s. One visible upstream Starlette/AnyIO deprecation warning.
+- `cd frontend && npm test`: **23 tests passed** across 8 files, 2.51s.
+- `cd frontend && npm run typecheck`: passed.
+- `cd frontend && npm run build`: optimized Next.js production build passed.
+- Authenticated local HTTP: `/health` and the frontend returned 200; `/status` returned 200 with a private token and confirmed selected lesion and segmentation artifacts, 9 datasets, 19 processed images and 40 completed runs. The token is not written to this report.
+- Actual browser workflow against the live frontend/API: unlocked with the local token, uploaded the public held-out ISIC image `ISIC_0024309.jpg`, received its real EfficientNet-B0 scores and model-generated Grad-CAM, and rendered the top-ranked class with an explicit uncalibrated/research-only note. A second browser workflow ran selected Tiny U-Net segmentation and displayed the computed overlay and binary mask. Both workflows completed without browser errors.
+- Live captures: `docs/screenshots/local-demo-dashboard.png`, `local-demo-inference.png`, and `local-demo-segmentation.png`. The image used is public research data; see LOCAL_DEMO.md for its evaluation-split caveat.
+- A preliminary browser harness attempt queried the navigation as buttons; the real app uses anchor links. Corrected the harness and completed the workflows. An initial `npm run test:unit -- --run` invocation failed because there is no `test:unit` script; the project's documented `npm test` command passed. No application assertions were weakened.
+
+The screenshot/browser checks are local presentation evidence only. They do not establish clinical validity, patient-independent generalization, or compatibility with other browsers.
+
 2026-10-29: inspected repository; supplied upstream has README only. Python imports verified torch 2.13.0, OpenCV 5.0.0 and SIFT availability; CUDA/MPS false in current process. No tests or model evaluations existed. No real-data verification performed. Clinical inference BLOCKED.
 
 ## First algorithm/API milestone
