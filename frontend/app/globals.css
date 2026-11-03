@@ -212,6 +212,22 @@ details {
 .nav-item svg:last-child:not(:first-child) {
   margin-left: auto;
 }
+.tutorial-tag {
+  flex-shrink: 0;
+  margin-left: 3px;
+  padding: 2px 5px;
+  border: 1px solid #577984;
+  border-radius: 999px;
+  color: #d3e9e8;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.nav-item.active .tutorial-tag {
+  border-color: #9edbd2;
+  color: #ffffff;
+}
 .nav-item:hover {
   background: #254c58;
   color: white;

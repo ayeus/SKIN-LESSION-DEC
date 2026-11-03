@@ -49,16 +49,29 @@ it("requires access before rendering data and never persists the token", () => {
 it("shows actual zero counts and disables lesion prediction without a model", async () => {
   const user = await unlock();
   expect(screen.getByText("Awaiting model")).toBeVisible();
-  await user.click(screen.getByRole("link", { name: "Lesion detection" }));
+  await user.click(screen.getByRole("link", { name: /Lesion detection/ }));
   expect(screen.getByText("A trained lesion model is required")).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Run research inference" }),
   ).not.toBeInTheDocument();
 });
+it("maps tutorial numbers beside their workspace sections", async () => {
+  await unlock();
+  expect(screen.getByLabelText("Tutorial T1")).toHaveTextContent("(T1)");
+  expect(screen.getByLabelText("Tutorial T2–T3")).toHaveTextContent("(T2–T3)");
+  expect(screen.getAllByLabelText("Tutorial T5")).toHaveLength(3);
+  expect(screen.getByLabelText("Tutorial T6")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T7")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T8")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T9")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T10–T12")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T13")).toBeVisible();
+  expect(screen.getByLabelText("Tutorial T14–T15")).toBeVisible();
+});
 it("requires authorized files and provenance to import data", async () => {
   const user = await unlock();
   await user.click(
-    screen.getByRole("link", { name: "EHR & dataset management" }),
+    screen.getByRole("link", { name: /EHR & dataset management/ }),
   );
   expect(screen.getByLabelText("Dataset file")).toBeRequired();
   expect(screen.getByLabelText("Source URL / citation")).toBeRequired();
@@ -68,7 +81,7 @@ it("requires authorized files and provenance to import data", async () => {
 });
 it("shows missing operational inputs instead of fabricated demand", async () => {
   const user = await unlock();
-  await user.click(screen.getByRole("link", { name: "Patient demand" }));
+  await user.click(screen.getByRole("link", { name: /Patient demand/ }));
   expect(screen.getByText("Waiting for a compatible dataset")).toBeVisible();
   expect(screen.getByText(/28 complete daily observations/)).toBeVisible();
   expect(
@@ -77,7 +90,7 @@ it("shows missing operational inputs instead of fabricated demand", async () => 
 });
 it("validates image upload and clears data when workspace is locked", async () => {
   const user = await unlock();
-  await user.click(screen.getByRole("link", { name: "Image processing lab" }));
+  await user.click(screen.getByRole("link", { name: /Image processing lab/ }));
   expect(screen.getByLabelText("Image", { exact: true })).toBeRequired();
   expect(screen.getByLabelText("Image", { exact: true })).toHaveAttribute(
     "accept",

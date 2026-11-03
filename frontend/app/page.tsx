@@ -66,26 +66,27 @@ type Run = {
   error?: string;
 };
 const modules = [
-  { id: "dashboard", name: "Research overview", icon: LayoutDashboard },
-  { id: "inference", name: "Lesion detection", icon: ScanLine },
-  { id: "image", name: "Image processing lab", icon: SlidersHorizontal },
-  { id: "registration", name: "SIFT & RANSAC", icon: Layers },
-  { id: "training", name: "CNN training & evaluation", icon: BrainCircuit },
-  { id: "visualization", name: "Biomedical visualization", icon: Microscope },
-  { id: "datasets", name: "EHR & dataset management", icon: Database },
-  { id: "preprocess", name: "Data preprocessing", icon: SlidersHorizontal },
-  { id: "text", name: "Clinical text analytics", icon: FileText },
-  { id: "forecast", name: "Patient demand", icon: TrendingUp },
+  { id: "dashboard", name: "Research overview", tutorial: "", icon: LayoutDashboard },
+  { id: "inference", name: "Lesion detection", tutorial: "T5", icon: ScanLine },
+  { id: "image", name: "Image processing lab", tutorial: "T4", icon: SlidersHorizontal },
+  { id: "registration", name: "SIFT & RANSAC", tutorial: "T5", icon: Layers },
+  { id: "training", name: "CNN training & evaluation", tutorial: "T5", icon: BrainCircuit },
+  { id: "visualization", name: "Biomedical visualization", tutorial: "T6", icon: Microscope },
+  { id: "datasets", name: "EHR & dataset management", tutorial: "T1", icon: Database },
+  { id: "preprocess", name: "Data preprocessing", tutorial: "T2–T3", icon: SlidersHorizontal },
+  { id: "text", name: "Clinical text analytics", tutorial: "T10–T12", icon: FileText },
+  { id: "forecast", name: "Patient demand", tutorial: "T7", icon: TrendingUp },
   {
     id: "overview",
     name: "Historical healthcare indicators",
+    tutorial: "T8",
     icon: ChartNoAxesCombined,
   },
-  { id: "planning", name: "Healthcare planning", icon: ChartNoAxesCombined },
-  { id: "reduce", name: "Dimensionality reduction", icon: ScatterChart },
-  { id: "research", name: "Adult weight research", icon: Scale },
-  { id: "reports", name: "Reports & history", icon: FolderDown },
-  { id: "settings", name: "Data & model status", icon: Settings },
+  { id: "planning", name: "Healthcare planning", tutorial: "T9", icon: ChartNoAxesCombined },
+  { id: "reduce", name: "Dimensionality reduction", tutorial: "T13", icon: ScatterChart },
+  { id: "research", name: "Adult weight research", tutorial: "T14–T15", icon: Scale },
+  { id: "reports", name: "Reports & history", tutorial: "", icon: FolderDown },
+  { id: "settings", name: "Data & model status", tutorial: "", icon: Settings },
 ];
 const descriptions: Record<string, string> = {
   overview:
@@ -767,6 +768,11 @@ export default function Home() {
               >
                 <m.icon size={17} />
                 {m.name}
+                {m.tutorial && (
+                  <span className="tutorial-tag" aria-label={`Tutorial ${m.tutorial}`}>
+                    ({m.tutorial})
+                  </span>
+                )}
                 {page === m.id && <ChevronRight size={14} />}
               </a>
             </div>
