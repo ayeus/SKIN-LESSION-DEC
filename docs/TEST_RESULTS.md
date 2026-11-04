@@ -140,3 +140,10 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - `cd frontend && npm test -- --run`: **28 passed** across 9 files; `npm run typecheck`: passed; `npm run build`: passed.
 - Live API checks: health 200, 13 real registered datasets, lesion and segmentation model availability both true, zero active jobs. Authenticated sample-image route returned the public ISIC JPEG (200); frontend `/api/demo/lesion-image` proxy also returned 200. Actual ephemeral CNN inference returned 200 without retention; actual CLAHE processing returned a completed result. No training was started.
 - `git diff --check`: passed. No test run used application mock observations; the synthetic image in the route unit test is confined to that test fixture.
+
+## GitHub Actions failure repair — 2026-11-04
+
+- Investigated the red checks on `a179a8f`: backend PostgreSQL verification hard-coded macOS `/private/tmp`, which does not exist on the Ubuntu runner. It now uses Python's platform-specific temporary directory and removes its isolated storage after the disposable database check.
+- The browser suite was timing out because sidebar links include visible tutorial badges in their accessible names; locators now match the visible link label while permitting the badge. The image test now explicitly selects its synthetic test upload after the UI added the built-in sample default. The processing-method select now has an explicit form name and accessible label.
+- Playwright's isolated frontend server now uses a dedicated `.next-e2e` build directory so local browser verification does not contend with an already-running presentation server.
+- Verified locally: `.venv/bin/python -m scripts.check_postgres` — **36 PostgreSQL-backed tests passed**; `cd frontend && npm run test:browser` — **8 passed** across desktop and mobile, including real algorithm execution and accessibility scans. The full existing backend suite and frontend component/type/build checks were already green on this code except for these CI-only issues.

@@ -1425,6 +1425,8 @@ export default function Home() {
                           <label>
                             Processing method
                             <select
+                              name="method"
+                              aria-label="Processing method"
                               value={method}
                               onChange={(e) => setMethod(e.target.value)}
                             >

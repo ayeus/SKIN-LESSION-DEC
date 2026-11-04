@@ -45,7 +45,7 @@ export default defineConfig({
       url: "http://127.0.0.1:18300",
       reuseExistingServer: false,
       timeout: 60000,
-      env: { API_URL: "http://127.0.0.1:18400" },
+      env: { API_URL: "http://127.0.0.1:18400", DERMA_E2E: "1" },
     },
   ],
 });

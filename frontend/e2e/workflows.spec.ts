@@ -13,7 +13,8 @@ async function connect(page: Page) {
 async function navigate(page: Page, name: string) {
   const toggle = page.getByRole("button", { name: "Toggle navigation" });
   if (await toggle.isVisible()) await toggle.click();
-  await page.getByRole("link", { name, exact: true }).click();
+  // The accessible link name includes the visible tutorial badge, e.g. (T5).
+  await page.getByRole("link", { name, exact: false }).first().click();
   await expect(
     page.getByRole("heading", { level: 1, name, exact: true }),
   ).toBeVisible();
@@ -63,12 +64,13 @@ test("actual image processing, invalid-file errors and persisted export", async 
   page.on("pageerror", (error) => errors.push(error.message));
   await connect(page);
   await navigate(page, "Image processing lab");
+  await page.getByLabel("Image source").selectOption("upload");
   await page
-    .getByLabel("Image", { exact: true })
+    .getByLabel("Image file", { exact: true })
     .setInputFiles(
       resolve("e2e/fixtures/synthetic-geometric-algorithm-test.png"),
     );
-  await page.getByLabel("Processing method").selectOption("gamma");
+  await page.locator('select[name="method"]').selectOption("gamma");
   await page.getByLabel("Algorithm parameters (JSON)").fill('{"gamma":1}');
   const response = page.waitForResponse(
     (r) =>
@@ -109,7 +111,7 @@ test("actual image processing, invalid-file errors and persisted export", async 
     path: testInfo.outputPath("isolated-geometric-image-processing.png"),
     fullPage: true,
   });
-  await page.getByLabel("Image", { exact: true }).setInputFiles({
+  await page.getByLabel("Image file", { exact: true }).setInputFiles({
     name: "synthetic-invalid.png",
     mimeType: "image/png",
     buffer: Buffer.from("invalid fixture"),

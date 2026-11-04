@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 const config: NextConfig = {
   devIndicators: false,
+  distDir: process.env.DERMA_E2E === "1" ? ".next-e2e" : ".next",
   turbopack: { root: dirname(fileURLToPath(import.meta.url)) },
   async rewrites() {
     return [

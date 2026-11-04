@@ -2,8 +2,10 @@
 
 import os
 import secrets
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from uuid import uuid4
 
@@ -12,6 +14,7 @@ def check():
     name = "derma-check-" + uuid4().hex[:12]
     env = os.environ.copy()
     env["POSTGRES_PASSWORD"] = secrets.token_urlsafe(24)
+    storage_path = os.path.join(tempfile.gettempdir(), name)
     started = False
     try:
         subprocess.run(
@@ -65,7 +68,7 @@ def check():
         env["DATABASE_URL"] = (
             f"postgresql+psycopg2://derma:{env['POSTGRES_PASSWORD']}@127.0.0.1:{port}/dermatest"
         )
-        env["DERMA_STORAGE"] = "/private/tmp/" + name
+        env["DERMA_STORAGE"] = storage_path
         subprocess.run(
             [
                 sys.executable,
@@ -104,6 +107,7 @@ def check():
             subprocess.run(
                 ["docker", "stop", "--time", "5", name], check=True, capture_output=True
             )
+        shutil.rmtree(storage_path, ignore_errors=True)
 
 
 if __name__ == "__main__":
