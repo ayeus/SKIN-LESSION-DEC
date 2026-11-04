@@ -43,3 +43,5 @@ No tutorial is declared fully complete. See coverage matrix, acquisition evidenc
 - Added a dashboard quick-start panel that uses the live registry names and counts for loaded EHR, demand, weight, clinical-text and image workflows; quick-start actions select the matching dataset where applicable.
 - Added tutorial-tagged, plain-language instructions above each module form, including actual column names and example JSON for loaded datasets, plus a beginner guide covering local startup and T1–T15 workflows.
 - Frontend TypeScript, all 27 component tests, and production build passed. A direct Chromium walkthrough verified the live dashboard and NHANES form. The configured standalone Playwright runner did not start because Next.js detected the already-running dev server's shared `.next` directory; see `TEST_RESULTS.md`.
+
+- T6 usability correction (2026-11-04): Inspect now scrolls its fetched result into view after loading, addressing the long-history-table case where a successful fetch looked like no action. Confirmed in a live browser with a persisted run; typecheck, 27 frontend tests, and production build pass.

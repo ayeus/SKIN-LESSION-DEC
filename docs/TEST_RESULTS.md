@@ -108,3 +108,11 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - Live headless Chromium against the running local app/API: authenticated using the local private token (not logged or saved), confirmed loaded MIMIC-IV, UKHSA, NHANES and MACCROBAT quick-starts, opened the NHANES walkthrough, and found no browser exceptions. Captures: `beginner-dashboard.png` and `beginner-weight-guide.png`.
 - `git diff --check`: passed.
 - `cd frontend && npm run test:browser`: **could not start** because the configured Next.js web server detected an already-running development server using the same `.next` development directory and exited. This is a harness/server-lock issue; the direct live-browser walkthrough above passed. Full isolated Playwright suite remains unverified in this run.
+
+## T6 Inspect visibility fix — 2026-11-04
+
+- Root cause: Inspect fetched and rendered the saved report after a long artifact table, below the current viewport, so the click appeared to do nothing.
+- `cd frontend && npm run typecheck`: passed.
+- `cd frontend && npm test`: **27 passed** across 9 files.
+- `cd frontend && npm run build`: optimized production build passed.
+- Live headless Chromium against the local app/API: clicked Inspect on an actual persisted run, confirmed the report loaded and its results heading scrolled into the viewport; no browser exceptions.

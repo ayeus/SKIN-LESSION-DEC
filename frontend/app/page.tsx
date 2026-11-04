@@ -13,7 +13,7 @@ import ForecastEvidence from "./components/forecast-evidence";
 import AccountLogin from "./components/account-login";
 import AccountPanel from "./components/account-panel";
 import DatasetExplorer from "./components/dataset-explorer";
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import {
   Activity,
   LayoutDashboard,
@@ -502,6 +502,15 @@ export default function Home() {
     [parameters, setParameters] = useState("{}"),
     [mobile, setMobile] = useState(false),
     [query, setQuery] = useState("");
+  const resultsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result && (page === "reports" || page === "visualization")) {
+      resultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [page, result]);
   async function api(path: string, init: RequestInit = {}) {
     const response = await fetch("/api" + path, {
       ...init,
@@ -1654,6 +1663,7 @@ export default function Home() {
                               <td>
                                 <button
                                   onClick={async () => {
+                                    setError("");
                                     try {
                                       setResult(await api("/runs/" + r.id));
                                     } catch (e) {
@@ -1781,7 +1791,7 @@ export default function Home() {
                 </p>
               )}
               {result && (
-                <>
+                <div ref={resultsRef} tabIndex={-1}>
                   <Results
                     value={result}
                     onSelectSegmentation={
@@ -1812,7 +1822,7 @@ export default function Home() {
                       Export report
                     </button>
                   )}
-                </>
+                </div>
               )}
             </>
           )}
