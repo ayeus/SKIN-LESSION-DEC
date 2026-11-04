@@ -4,6 +4,8 @@ A working local research workspace for biomedical image processing, CNN experime
 
 ## Current state
 
+New to the app? Follow the [Beginner guide](docs/BEGINNER_GUIDE.md). The dashboard also offers quick starts, and each module explains which data and fields to use.
+
 Real FastAPI/SQLAlchemy services, integrated Next.js UI, local accounts/roles, private datasets/read grants, revocable sessions, persistent runs/audits, immutable imports, real image algorithms, SIFT/RANSAC, group-aware CNN CLI and web experiments with explicit artifact selection, actual Grad-CAM, EHR transformations, strict FHIR-subset imports and filtered relationship exploration, TF-IDF/BM25/contextual sense ranking, forecasting, historical indicators, PCA/t-SNE and observational regression diagnostics. Public MIMIC-IV demo EHR, MACCROBAT clinical case reports with a locally trained/tested research NER model, UKHSA historical national COVID-admission counts, NHANES adult research data, ISIC2018/HAM10000 classification images, and ISIC Task 1 segmentation images/masks have been acquired locally and exercised; data files remain excluded from Git. Lesion classification and segmentation research models have been trained and explicitly selected, and their live image workflows have been verified. Clinical and patient-independent validation remain incomplete. See [the local presentation demo](docs/LOCAL_DEMO.md), [acquisition evidence](docs/DATA_ACQUISITION.md), and [current implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 - [Run locally and execute workflows](docs/RUNNING.md)

@@ -17,3 +17,8 @@ Captured by actual headless Chromium against the real Next.js frontend, API, mig
 - `isolated-model-blocked-desktop.png`: honest missing-model state in a disposable environment. Production research storage/model selection is never mounted into these tests.
 
 Screenshots were inspected visually. Full-page captures show a viewport-height fixed sidebar; a blank lower-left region below that captured viewport is expected. The Next.js development indicator is visible because these checks run the development server. No patient records, real credentials or invented medical scores appear. Native Chrome screen capture remains unavailable; these images come from the separate headless test browser.
+
+## Beginner quick-start captures
+
+- `beginner-dashboard.png`: live dashboard with quick-start options and registry-derived data counts.
+- `beginner-weight-guide.png`: live T14–T15 module with the selected NHANES dataset, actual available columns and exact feature/outcome instructions.

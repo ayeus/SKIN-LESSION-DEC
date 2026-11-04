@@ -6,6 +6,7 @@ import SenseEvidence from "./components/sense-evidence";
 import EntityDocument from "./components/entity-document";
 import TrainingHistory from "./components/training-history";
 import ClinicalModelPanel from "./components/clinical-model-panel";
+import SectionGuide, { StartHere } from "./components/section-guides";
 import TrainingPanel from "./components/training-panel";
 import EmbeddingView from "./components/embedding-view";
 import ForecastEvidence from "./components/forecast-evidence";
@@ -569,7 +570,7 @@ export default function Home() {
       window.removeEventListener("hashchange", restoreModule);
     };
   }, []);
-  function navigate(id: string) {
+  function navigate(id: string, datasetId?: string) {
     if (window.location.hash !== `#${id}`)
       window.history.pushState(null, "", `#${id}`);
     setPage(id);
@@ -577,7 +578,7 @@ export default function Home() {
     setError("");
     setParameters("{}");
     setMobile(false);
-    setSelected("");
+    setSelected(datasetId || "");
   }
   async function submit(e: FormEvent<HTMLFormElement>, type: string) {
     e.preventDefault();
@@ -883,6 +884,14 @@ export default function Home() {
             </section>
           ) : (
             <>
+              {page !== "dashboard" && (
+                <SectionGuide
+                  page={page}
+                  datasets={datasets}
+                  modelReady={Boolean(status?.model_available)}
+                  onNavigate={navigate}
+                />
+              )}
               {status?.access?.role === "viewer" && (
                 <p className="notice">
                   Read-only account: inspect explicitly granted datasets.
@@ -898,39 +907,12 @@ export default function Home() {
               )}
               {page === "dashboard" && (
                 <>
-                  <section className="overview-banner">
-                    <div>
-                      <span className="badge pale">
-                        Evidence before conclusions
-                      </span>
-                      <h2>
-                        A clear view of your
-                        <br />
-                        research, from source to result.
-                      </h2>
-                      <p>
-                        Process images, inspect data and compare methods in one
-                        traceable workspace. Start with your approved source
-                        data.
-                      </p>
-                      <button
-                        className="primary"
-                        onClick={() => navigate("datasets")}
-                      >
-                        <Upload size={16} /> Import a dataset
-                      </button>
-                      <button
-                        className="text-button"
-                        onClick={() => navigate("image")}
-                      >
-                        Open image laboratory <ChevronRight size={16} />
-                      </button>
-                    </div>
-                    <div className="research-mark" aria-hidden="true">
-                      <Microscope size={110} strokeWidth={0.9} />
-                      <span>Observe. Measure. Verify.</span>
-                    </div>
-                  </section>
+                  <StartHere
+                    page={page}
+                    datasets={datasets}
+                    modelReady={Boolean(status?.model_available)}
+                    onNavigate={navigate}
+                  />
                   <section className="metrics">
                     {[
                       [

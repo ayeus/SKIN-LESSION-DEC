@@ -99,3 +99,12 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - `.venv/bin/python -m pytest backend/tests -q`: **83 passed**, 7.69s; one visible upstream deprecation warning. New tests verify strict/discontinuous BRAT parsing, overlapping-gold recall denominator, grouped splits/duplicate rejection, actual isolated NER training/selection/inference and corruption rejection. An initial isolated test missed application lifespan/schema setup; fixed the test setup before rerun, preserving assertions. Relative-path acquisition logging was corrected after a real acquisition exposed the issue; cache provenance regression tested.
 - `.venv/bin/python -m scripts.check_postgres`: **31 passed**, 7.02s, now includes clinical-corpus training/selection tests against migrated disposable PostgreSQL; container removed.
 - `cd frontend && npm run typecheck`, then component tests/build: **20 tests passed**, 2.08s; optimized build passed. Selection requires prior report review, never promotes on load, and is hidden from readers. A test-file write initially used the wrong cwd; corrected the path and ran the intended tests. Browser visual QA remains NOT VERIFIED.
+
+## Beginner usability guide — 2026-11-04
+
+- `cd frontend && npm run typecheck`: passed.
+- `cd frontend && npm test`: **27 passed** across 9 files. Added focused checks for dashboard quick starts, dataset selection, and T8/NHANES input instructions. The first run found an ambiguous test query for a field shown twice; the query was corrected without changing the application behavior; rerun passed.
+- `cd frontend && npm run build`: optimized Next.js production build passed.
+- Live headless Chromium against the running local app/API: authenticated using the local private token (not logged or saved), confirmed loaded MIMIC-IV, UKHSA, NHANES and MACCROBAT quick-starts, opened the NHANES walkthrough, and found no browser exceptions. Captures: `beginner-dashboard.png` and `beginner-weight-guide.png`.
+- `git diff --check`: passed.
+- `cd frontend && npm run test:browser`: **could not start** because the configured Next.js web server detected an already-running development server using the same `.next` development directory and exited. This is a harness/server-lock issue; the direct live-browser walkthrough above passed. Full isolated Playwright suite remains unverified in this run.
