@@ -116,3 +116,11 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - `cd frontend && npm test`: **27 passed** across 9 files.
 - `cd frontend && npm run build`: optimized production build passed.
 - Live headless Chromium against the local app/API: clicked Inspect on an actual persisted run, confirmed the report loaded and its results heading scrolled into the viewport; no browser exceptions.
+
+## T6 visualization library and active CNN interruption — 2026-11-04
+
+- Replaced the flat all-runs dump on T6 with topic groups driven by persisted run kinds: Images, Model evaluation, Clinical text, Healthcare analytics, and Data quality. The overview shows up to four actual recent runs per group, with category filters to browse the full set. Search matches actual kind, status, date, run ID and error text; export and Inspect still call the real APIs.
+- `cd frontend && npm run typecheck`: passed. `cd frontend && npm test`: **27 passed**. `cd frontend && npm run build`: passed.
+- Live Chromium checked five category groups, forecast search (3 matching persisted runs), Images filter (31 persisted runs), Inspect loading a real result, and a 390px mobile viewport with no horizontal overflow. Capture: `docs/screenshots/t6-organized-library.png`.
+- Responding to the owner's stop request, confirmed a live CNN job at epoch 2/5 with the API process consuming CPU. The then-current server had no cancellation route, so its API process was stopped and restarted. Startup correctly marked the interrupted run failed with the recorded process-ended reason. API health returned 200 after restart; no training run remains active. No completion or model result is claimed for the interrupted run.
+- The web Playwright runner was not rerun; browser verification above used the live authenticated app and API directly.

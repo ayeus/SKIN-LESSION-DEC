@@ -45,3 +45,5 @@ No tutorial is declared fully complete. See coverage matrix, acquisition evidenc
 - Frontend TypeScript, all 27 component tests, and production build passed. A direct Chromium walkthrough verified the live dashboard and NHANES form. The configured standalone Playwright runner did not start because Next.js detected the already-running dev server's shared `.next` directory; see `TEST_RESULTS.md`.
 
 - T6 usability correction (2026-11-04): Inspect now scrolls its fetched result into view after loading, addressing the long-history-table case where a successful fetch looked like no action. Confirmed in a live browser with a persisted run; typecheck, 27 frontend tests, and production build pass.
+
+- T6 now groups persisted runs by research area, caps the overview to four recent cards per group with “View all,” and adds a search field/category filters. Live browser verified results and mobile layout. An active CNN job was stopped at the owner's request by restarting the API because that server had no cancellation endpoint; it is recorded as interrupted/failed, and the API is available again.

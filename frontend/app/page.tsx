@@ -37,6 +37,7 @@ import {
   Microscope,
   Check,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -66,16 +67,99 @@ type Run = {
   created_at: string;
   error?: string;
 };
+const visualizationCategories = [
+  { id: "all", label: "All results" },
+  { id: "images", label: "Images" },
+  { id: "models", label: "Model evaluation" },
+  { id: "text", label: "Clinical text" },
+  { id: "analytics", label: "Healthcare analytics" },
+  { id: "quality", label: "Data quality" },
+  { id: "other", label: "Other" },
+] as const;
+function categoryForRun(kind: string) {
+  if (
+    ["image", "registration", "inference", "segmentation_benchmark"].includes(
+      kind,
+    )
+  )
+    return "images";
+  if (
+    ["training", "segmentation_training", "clinical_ner_training"].includes(
+      kind,
+    )
+  )
+    return "models";
+  if (kind === "text") return "text";
+  if (["forecast", "overview", "planning", "reduce", "research"].includes(kind))
+    return "analytics";
+  if (["preprocess", "relationship"].includes(kind)) return "quality";
+  return "other";
+}
+function labelForRun(kind: string) {
+  const labels: Record<string, string> = {
+    image: "Image processing",
+    registration: "SIFT & RANSAC registration",
+    inference: "Lesion research inference",
+    segmentation_benchmark: "Segmentation benchmark",
+    training: "CNN training run",
+    segmentation_training: "Segmentation model training",
+    clinical_ner_training: "Clinical NER model training",
+    text: "Clinical text analysis",
+    forecast: "Patient demand forecast",
+    overview: "Historical indicators",
+    planning: "Healthcare planning",
+    reduce: "Dimensionality reduction",
+    research: "Adult weight research",
+    preprocess: "Data preprocessing",
+    relationship: "EHR relationship inspection",
+  };
+  return labels[kind] || kind.replaceAll("_", " ");
+}
 const modules = [
-  { id: "dashboard", name: "Research overview", tutorial: "", icon: LayoutDashboard },
+  {
+    id: "dashboard",
+    name: "Research overview",
+    tutorial: "",
+    icon: LayoutDashboard,
+  },
   { id: "inference", name: "Lesion detection", tutorial: "T5", icon: ScanLine },
-  { id: "image", name: "Image processing lab", tutorial: "T4", icon: SlidersHorizontal },
+  {
+    id: "image",
+    name: "Image processing lab",
+    tutorial: "T4",
+    icon: SlidersHorizontal,
+  },
   { id: "registration", name: "SIFT & RANSAC", tutorial: "T5", icon: Layers },
-  { id: "training", name: "CNN training & evaluation", tutorial: "T5", icon: BrainCircuit },
-  { id: "visualization", name: "Biomedical visualization", tutorial: "T6", icon: Microscope },
-  { id: "datasets", name: "EHR & dataset management", tutorial: "T1", icon: Database },
-  { id: "preprocess", name: "Data preprocessing", tutorial: "T2–T3", icon: SlidersHorizontal },
-  { id: "text", name: "Clinical text analytics", tutorial: "T10–T12", icon: FileText },
+  {
+    id: "training",
+    name: "CNN training & evaluation",
+    tutorial: "T5",
+    icon: BrainCircuit,
+  },
+  {
+    id: "visualization",
+    name: "Biomedical visualization",
+    tutorial: "T6",
+    icon: Microscope,
+  },
+  {
+    id: "datasets",
+    name: "EHR & dataset management",
+    tutorial: "T1",
+    icon: Database,
+  },
+  {
+    id: "preprocess",
+    name: "Data preprocessing",
+    tutorial: "T2–T3",
+    icon: SlidersHorizontal,
+  },
+  {
+    id: "text",
+    name: "Clinical text analytics",
+    tutorial: "T10–T12",
+    icon: FileText,
+  },
   { id: "forecast", name: "Patient demand", tutorial: "T7", icon: TrendingUp },
   {
     id: "overview",
@@ -83,9 +167,24 @@ const modules = [
     tutorial: "T8",
     icon: ChartNoAxesCombined,
   },
-  { id: "planning", name: "Healthcare planning", tutorial: "T9", icon: ChartNoAxesCombined },
-  { id: "reduce", name: "Dimensionality reduction", tutorial: "T13", icon: ScatterChart },
-  { id: "research", name: "Adult weight research", tutorial: "T14–T15", icon: Scale },
+  {
+    id: "planning",
+    name: "Healthcare planning",
+    tutorial: "T9",
+    icon: ChartNoAxesCombined,
+  },
+  {
+    id: "reduce",
+    name: "Dimensionality reduction",
+    tutorial: "T13",
+    icon: ScatterChart,
+  },
+  {
+    id: "research",
+    name: "Adult weight research",
+    tutorial: "T14–T15",
+    icon: Scale,
+  },
   { id: "reports", name: "Reports & history", tutorial: "", icon: FolderDown },
   { id: "settings", name: "Data & model status", tutorial: "", icon: Settings },
 ];
@@ -414,7 +513,8 @@ export function Results({
       )}
       {r.research_prediction && (
         <div className="notice" role="status">
-          Research model top-ranked label: <strong>{r.research_prediction}</strong>
+          Research model top-ranked label:{" "}
+          <strong>{r.research_prediction}</strong>
           <br />
           This is an uncalibrated research output, not a diagnosis or a measure
           of clinical confidence.
@@ -486,6 +586,60 @@ export function Results({
     </section>
   );
 }
+function RunCard({
+  run,
+  inspecting,
+  onInspect,
+  onExport,
+}: {
+  run: Run;
+  inspecting: boolean;
+  onInspect: () => void;
+  onExport: (format?: string) => void;
+}) {
+  return (
+    <article className="visual-run-card" key={run.id}>
+      <div className="visual-run-card-top">
+        <span className="visual-run-category">
+          {visualizationCategories.find(
+            (item) => item.id === categoryForRun(run.kind),
+          )?.label || "Research"}
+        </span>
+        <span className={run.status === "completed" ? "badge green" : "badge"}>
+          {run.status}
+        </span>
+      </div>
+      <h3>{labelForRun(run.kind)}</h3>
+      <p className="visual-run-date">
+        {new Date(run.created_at).toLocaleString()}
+      </p>
+      <p className="visual-run-id" title={run.id}>
+        Run {run.id.slice(0, 8)}
+      </p>
+      {run.error && <p className="visual-run-error">{run.error}</p>}
+      <div className="visual-run-actions">
+        <button
+          type="button"
+          className="primary"
+          disabled={inspecting}
+          onClick={onInspect}
+        >
+          {inspecting ? "Loading…" : "Inspect results"}
+        </button>
+        {run.status === "completed" && (
+          <button type="button" onClick={() => onExport()}>
+            Export JSON
+          </button>
+        )}
+        {run.kind === "preprocess" && run.status === "completed" && (
+          <button type="button" onClick={() => onExport("csv")}>
+            Export CSV
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
 export default function Home() {
   const [token, setToken] = useState(""),
     [entry, setEntry] = useState(""),
@@ -501,7 +655,10 @@ export default function Home() {
     [method, setMethod] = useState("clahe"),
     [parameters, setParameters] = useState("{}"),
     [mobile, setMobile] = useState(false),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [runSearch, setRunSearch] = useState(""),
+    [runCategory, setRunCategory] = useState("all"),
+    [inspectingRun, setInspectingRun] = useState("");
   const resultsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (result && (page === "reports" || page === "visualization")) {
@@ -695,8 +852,28 @@ export default function Home() {
       setError((e as Error).message);
     }
   }
+  async function inspectRun(run: Run) {
+    setError("");
+    setInspectingRun(run.id);
+    try {
+      setResult(await api("/runs/" + run.id));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setInspectingRun("");
+    }
+  }
   const current = modules.find((m) => m.id === page)!;
   const ds = datasets.find((d) => d.id === selected);
+  const visibleRuns = runs.filter((run) => {
+    const matchesCategory =
+      page === "reports" ||
+      runCategory === "all" ||
+      categoryForRun(run.kind) === runCategory;
+    const haystack =
+      `${labelForRun(run.kind)} ${run.kind} ${run.status} ${run.id} ${run.created_at} ${run.error || ""}`.toLowerCase();
+    return matchesCategory && haystack.includes(runSearch.trim().toLowerCase());
+  });
   const compatible = datasets.filter((d) =>
     page === "text"
       ? d.modality === "clinical_text"
@@ -779,7 +956,10 @@ export default function Home() {
                 <m.icon size={17} />
                 {m.name}
                 {m.tutorial && (
-                  <span className="tutorial-tag" aria-label={`Tutorial ${m.tutorial}`}>
+                  <span
+                    className="tutorial-tag"
+                    aria-label={`Tutorial ${m.tutorial}`}
+                  >
                     ({m.tutorial})
                   </span>
                 )}
@@ -1626,13 +1806,179 @@ export default function Home() {
                   onChange={() => void refresh()}
                 />
               )}
-              {["reports", "visualization"].includes(page) && (
+              {page === "visualization" && (
+                <section
+                  className="visual-library"
+                  aria-label="Visualization library"
+                >
+                  <div className="visual-library-heading">
+                    <div>
+                      <span className="visual-kicker">
+                        T6 · Results workspace
+                      </span>
+                      <h2>Explore your research results</h2>
+                      <p>
+                        Find saved analyses by topic, then inspect the recorded
+                        charts, images, and metrics.
+                      </p>
+                    </div>
+                    <button onClick={() => void refresh()}>
+                      Refresh results
+                    </button>
+                  </div>
+                  <div className="visual-library-toolbar">
+                    <label className="visual-search">
+                      <Search size={18} aria-hidden="true" />
+                      <span className="sr-only">Search visualizations</span>
+                      <input
+                        type="search"
+                        value={runSearch}
+                        onChange={(event) => setRunSearch(event.target.value)}
+                        placeholder="Search by analysis, status, date, or run ID"
+                      />
+                    </label>
+                    <span className="visual-result-count" aria-live="polite">
+                      {visibleRuns.length} matching saved runs
+                    </span>
+                  </div>
+                  <nav
+                    className="visual-category-list"
+                    aria-label="Filter visualizations by category"
+                  >
+                    {visualizationCategories.map((category) => {
+                      const count =
+                        category.id === "all"
+                          ? runs.length
+                          : runs.filter(
+                              (run) => categoryForRun(run.kind) === category.id,
+                            ).length;
+                      return (
+                        <button
+                          key={category.id}
+                          type="button"
+                          className={
+                            runCategory === category.id
+                              ? "visual-category active"
+                              : "visual-category"
+                          }
+                          aria-pressed={runCategory === category.id}
+                          onClick={() => setRunCategory(category.id)}
+                        >
+                          {category.label}
+                          <span>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                  {visibleRuns.length ? (
+                    runCategory === "all" ? (
+                      <div className="visual-groups">
+                        {visualizationCategories.slice(1).map((category) => {
+                          const groupRuns = visibleRuns.filter(
+                            (run) => categoryForRun(run.kind) === category.id,
+                          );
+                          if (!groupRuns.length) return null;
+                          const groupCards = runSearch
+                            ? groupRuns
+                            : groupRuns.slice(0, 4);
+                          return (
+                            <section className="visual-group" key={category.id}>
+                              <div className="visual-group-heading">
+                                <div>
+                                  <h3>{category.label}</h3>
+                                  <span>{groupRuns.length} saved runs</span>
+                                </div>
+                                {!runSearch && groupRuns.length > 4 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRunCategory(category.id)}
+                                  >
+                                    View all {groupRuns.length}
+                                  </button>
+                                )}
+                              </div>
+                              <div className="visual-run-grid">
+                                {groupCards.map((run) => (
+                                  <RunCard
+                                    key={run.id}
+                                    run={run}
+                                    inspecting={inspectingRun === run.id}
+                                    onInspect={() => void inspectRun(run)}
+                                    onExport={(format) =>
+                                      void exportRun(run.id, format)
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="visual-run-grid">
+                        {visibleRuns.map((run) => (
+                          <RunCard
+                            key={run.id}
+                            run={run}
+                            inspecting={inspectingRun === run.id}
+                            onInspect={() => void inspectRun(run)}
+                            onExport={(format) =>
+                              void exportRun(run.id, format)
+                            }
+                          />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <div className="empty visual-empty">
+                      <FolderDown size={34} />
+                      <h3>
+                        {runs.length
+                          ? "No matching results"
+                          : "No results to visualize yet"}
+                      </h3>
+                      <p>
+                        {runs.length
+                          ? "Try another search term or category."
+                          : "Run an image, model, text, or analytics workflow. Its saved result will appear here."}
+                      </p>
+                      {(runSearch || runCategory !== "all") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRunSearch("");
+                            setRunCategory("all");
+                          }}
+                        >
+                          Clear search and filters
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
+              {page === "reports" && (
                 <section className="panel">
                   <div className="section-title">
-                    <h2>Persisted execution artifacts</h2>
+                    <h2>Run history and exports</h2>
                     <button onClick={() => void refresh()}>Refresh</button>
                   </div>
-                  {runs.length ? (
+                  <div className="visual-library-toolbar report-search">
+                    <label className="visual-search">
+                      <Search size={18} aria-hidden="true" />
+                      <span className="sr-only">Search run history</span>
+                      <input
+                        type="search"
+                        value={runSearch}
+                        onChange={(event) => setRunSearch(event.target.value)}
+                        placeholder="Search analyses, status, date, or run ID"
+                      />
+                    </label>
+                    <span className="visual-result-count" aria-live="polite">
+                      {visibleRuns.length} of {runs.length} runs
+                    </span>
+                  </div>
+                  {visibleRuns.length ? (
                     <div className="table-wrap">
                       <table>
                         <thead>
@@ -1644,45 +1990,45 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody>
-                          {runs.map((r) => (
-                            <tr key={r.id}>
-                              <td>{r.kind}</td>
+                          {visibleRuns.map((run) => (
+                            <tr key={run.id}>
+                              <td>{labelForRun(run.kind)}</td>
                               <td>
                                 <span
                                   className={
-                                    r.status === "completed"
+                                    run.status === "completed"
                                       ? "badge green"
                                       : "badge"
                                   }
                                 >
-                                  {r.status}
+                                  {run.status}
                                 </span>
-                                {r.error && <small>{r.error}</small>}
+                                {run.error && <small>{run.error}</small>}
                               </td>
-                              <td>{new Date(r.created_at).toLocaleString()}</td>
+                              <td>
+                                {new Date(run.created_at).toLocaleString()}
+                              </td>
                               <td>
                                 <button
-                                  onClick={async () => {
-                                    setError("");
-                                    try {
-                                      setResult(await api("/runs/" + r.id));
-                                    } catch (e) {
-                                      setError((e as Error).message);
-                                    }
-                                  }}
+                                  disabled={inspectingRun === run.id}
+                                  onClick={() => void inspectRun(run)}
                                 >
-                                  Inspect
+                                  {inspectingRun === run.id
+                                    ? "Loading…"
+                                    : "Inspect"}
                                 </button>
-                                {r.status === "completed" && (
-                                  <button onClick={() => void exportRun(r.id)}>
+                                {run.status === "completed" && (
+                                  <button
+                                    onClick={() => void exportRun(run.id)}
+                                  >
                                     JSON
                                   </button>
                                 )}
-                                {r.kind === "preprocess" &&
-                                  r.status === "completed" && (
+                                {run.kind === "preprocess" &&
+                                  run.status === "completed" && (
                                     <button
                                       onClick={() =>
-                                        void exportRun(r.id, "csv")
+                                        void exportRun(run.id, "csv")
                                       }
                                     >
                                       CSV
@@ -1697,9 +2043,15 @@ export default function Home() {
                   ) : (
                     <div className="empty">
                       <FolderDown size={34} />
-                      <h3>No execution artifacts yet</h3>
+                      <h3>
+                        {runs.length
+                          ? "No matching runs"
+                          : "No execution artifacts yet"}
+                      </h3>
                       <p>
-                        Run an image algorithm or import an approved dataset.
+                        {runs.length
+                          ? "Try a different search."
+                          : "Run an analysis to create an exportable report."}
                       </p>
                     </div>
                   )}
