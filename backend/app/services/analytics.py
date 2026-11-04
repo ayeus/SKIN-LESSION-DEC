@@ -241,6 +241,14 @@ def strategic(df, p):
         "definition": f"Sum of mapped {count}"
         if count
         else "Count of source rows; rows are NOT assumed to be unique patients or encounters.",
+        "mapped_fields": {
+            "date_column": date,
+            "category_column": group,
+            "count_column": count,
+            "date_format": p.get("date_format") if date else None,
+            "start_date": p.get("start_date") or None,
+            "end_date": p.get("end_date") or None,
+        },
     }
     if date:
         output["monthly_trend"] = [

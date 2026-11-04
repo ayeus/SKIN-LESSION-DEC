@@ -182,6 +182,9 @@ def test_strategic_aggregates_use_explicit_count_mapping():
         },
     )
     assert r["observed_total"] == 8 and r["distribution"] == {"a": 8.0}
+    assert r["mapped_fields"]["date_column"] == "date"
+    assert r["mapped_fields"]["category_column"] == "department"
+    assert r["mapped_fields"]["count_column"] == "arrivals"
     assert strategic(df, {})["observed_total"] == 3
 
 

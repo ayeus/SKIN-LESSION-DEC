@@ -67,6 +67,10 @@ Run an image, model, text, or analytics workflow first. Then open **Biomedical v
 2. The columns `date` and `count` and a 7-day horizon are prefilled.
 3. Select **Execute analysis**. Leave staffing fields empty unless you have real, approved assumptions.
 
+The results summarize how many days are forecast, the estimated total across that period, the highest estimated day, and the last observed day. A daily table gives the rounded estimate plus lower and upper bounds based on past model errors. The model comparison explains which method was selected and what MAE and RMSE mean; lower error is better. The chart legend spells out recorded counts, model estimates, and past-error bounds. Chart values retain their numeric precision.
+
+If you provide a staffing assumption, the result says how many patients per staff member per shift you assumed and shows the workload calculation. This is an example based on your assumption, not a staffing recommendation. Daily counts cannot tell the app how arrivals divide across shifts, so shift estimates require arrival shares and shift lengths from you.
+
 This forecasts national COVID admissions, not your hospital's arrivals or dermatology workload.
 
 ### T8 — Historical healthcare indicators
@@ -75,7 +79,7 @@ This forecasts national COVID admissions, not your hospital's arrivals or dermat
 2. The `admittime` date and `admission_type` group columns and required date format are prefilled. The count field stays blank because this analysis counts actual rows; it is not a source column.
 3. Select **Execute analysis**. The date format and grouping column are already entered.
 
-The result counts rows in this demo table. It is not a hospital-wide total or an automatic unique-patient count.
+The results label **Rows included** (records left after the date filters) and **Calculated total** (the number of source rows because no count column is selected). The month chart adds those records by month. The category table shows each `admission_type`, its count, and its share of the total. Open “Which source columns were used?” to see the date and grouping fields. These are counts in the demo table, not a hospital-wide total or an automatic unique-patient count; one person may have multiple records.
 
 ### T9 — Healthcare planning
 

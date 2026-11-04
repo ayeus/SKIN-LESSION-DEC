@@ -16,6 +16,7 @@ import AdultWeightEvidence, {
   adultWeightFeatureLabel,
 } from "./components/adult-weight-evidence";
 import ClinicalTextEvidence from "./components/clinical-text-evidence";
+import HealthcareOverviewEvidence from "./components/healthcare-overview-evidence";
 import { useEffect, useRef, useState, FormEvent } from "react";
 import {
   Activity,
@@ -260,7 +261,17 @@ const descriptions: Record<string, string> = {
   reports: "Review execution history and export actual results.",
   settings: "Understand what is available and what is missing.",
 };
-function Chart({ data, keys }: { data: any[]; keys: string[] }) {
+function Chart({
+  data,
+  keys,
+  seriesLabels = {},
+  yAxisLabel,
+}: {
+  data: any[];
+  keys: string[];
+  seriesLabels?: Record<string, string>;
+  yAxisLabel?: string;
+}) {
   const [offset, setOffset] = useState(0);
   const begin = Math.min(
     offset,
@@ -282,13 +293,20 @@ function Chart({ data, keys }: { data: any[]; keys: string[] }) {
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey={label} tick={{ fontSize: 11 }} />
-            <YAxis />
+            <YAxis
+              label={
+                yAxisLabel
+                  ? { value: yAxisLabel, angle: -90, position: "insideLeft" }
+                  : undefined
+              }
+            />
             <Tooltip />
             <Legend />
             {keys.map((key, index) => (
               <Line
                 key={key}
                 dataKey={key}
+                name={seriesLabels[key] || key}
                 stroke={["#087f83", "#bd6b37", "#6879b6"][index % 3]}
                 dot={false}
                 strokeWidth={2}
@@ -307,7 +325,7 @@ function Chart({ data, keys }: { data: any[]; keys: string[] }) {
               <tr>
                 <th>{data[0]?.[label] == null ? "Series row" : label}</th>
                 {keys.map((key) => (
-                  <th key={key}>{key}</th>
+                  <th key={key}>{seriesLabels[key] || key}</th>
                 ))}
               </tr>
             </thead>
@@ -363,6 +381,7 @@ export function Results({
       </div>
       {r.limitation && <p className="notice">{r.limitation}</p>}
       <AdultWeightEvidence result={r} />
+      <HealthcareOverviewEvidence result={r} />
       {r.image && (
         <div className="image-grid">
           {[
@@ -416,18 +435,57 @@ export function Results({
       )}
       {r.forecast && (
         <>
-          <h3>Observed daily counts</h3>
-          <Chart data={r.observed} keys={["count"]} />
-          <h3>Forecast and empirical residual band</h3>
-          <Chart data={r.forecast} keys={["count", "lower", "upper"]} />
-          <p>{r.uncertainty}</p>
+          <h3>Past daily counts from the source</h3>
+          <p>
+            Each point is a daily total in the selected dataset. Look for the
+            overall direction and repeating weekly patterns; short-term spikes
+            do not guarantee the same pattern will continue.
+          </p>
+          <Chart
+            data={r.observed}
+            keys={["count"]}
+            seriesLabels={{ count: "Recorded daily count" }}
+            yAxisLabel="Recorded events per day"
+          />
+          <h3>Estimated future counts and past-error band</h3>
+          <p>
+            The center line is the estimated daily count. The two boundary lines
+            show a range based on past model errors, not a promise about what
+            will happen.
+          </p>
+          <Chart
+            data={r.forecast}
+            keys={["count", "lower", "upper"]}
+            seriesLabels={{
+              count: "Estimated daily count",
+              lower: "Lower past-error bound",
+              upper: "Upper past-error bound",
+            }}
+            yAxisLabel="Estimated events per day"
+          />
+          <p className="notice">{r.uncertainty}</p>
         </>
       )}
       <ForecastEvidence result={r} Chart={Chart} />
       <SenseEvidence result={r} />
       <PlanningEvidence result={r} />
       <SegmentationEvidence manifest={r.manifest} />
-      {r.monthly_trend && <Chart data={r.monthly_trend} keys={["count"]} />}
+      {r.monthly_trend && (
+        <>
+          <h3>Observed total by month</h3>
+          <p>
+            Each point adds the selected row count or count-column values for
+            that month. This chart describes only the imported records and
+            filters used in this run.
+          </p>
+          <Chart
+            data={r.monthly_trend}
+            keys={["count"]}
+            seriesLabels={{ count: "Observed monthly total" }}
+            yAxisLabel="Rows or selected count value"
+          />
+        </>
+      )}
       {r.history && <TrainingHistory history={r.history} Chart={Chart} />}
       {r.manifest?.evaluation?.confusion_matrix && (
         <>

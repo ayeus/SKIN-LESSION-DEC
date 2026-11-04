@@ -6,11 +6,25 @@ const Chart = ({ data }: { data: any[]; keys: string[] }) => (
   <div aria-label="chart fixture">{data.length} supplied rows</div>
 );
 const base = {
-  forecast: [{ date: "2020-01-01", count: 10 }],
+  forecast: [{ date: "2020-01-01", count: 10, lower: 7, upper: 13 }],
+  observed: [{ date: "2019-12-31", count: 8 }],
   selected: "weekly_seasonal",
   validation_metrics: { weekly_seasonal: { mae: 2, rmse: 3 } },
   validation_protocol: "Chronological validation fixture",
 };
+it("explains the forecast summary, daily estimates, bounds and error scores", () => {
+  render(<ForecastEvidence result={base} Chart={Chart} />);
+  expect(screen.getByText(/Estimated total across those days/)).toBeVisible();
+  expect(screen.getByText("Highest estimated day")).toBeVisible();
+  expect(
+    screen.getByRole("columnheader", { name: "Estimated daily count (about)" }),
+  ).toBeVisible();
+  expect(screen.getByText("Lower past-error bound")).toBeVisible();
+  expect(screen.getByText(/MAE is the average size of a miss/)).toBeVisible();
+  expect(
+    screen.getAllByText(/Repeat the same weekday's recent average/).length,
+  ).toBeGreaterThan(0);
+});
 it("does not turn missing held-out metrics into zero performance", () => {
   render(<ForecastEvidence result={base} Chart={Chart} />);
   expect(screen.getByText(/no separately recorded test metrics/)).toBeVisible();
@@ -36,7 +50,7 @@ it("distinguishes measured test errors and explicit source scope", () => {
     />,
   );
   expect(
-    screen.getByText(/MAE 4.25 count units; RMSE 5.50 count units/),
+    screen.getByText(/typical miss \(MAE\) was 4.25 count units/),
   ).toBeVisible();
   expect(screen.getByText(/not local hospital demand/)).toBeVisible();
 });
@@ -59,7 +73,7 @@ it("reports workload equivalents without inventing shift allocations", () => {
   );
   expect(
     screen.getByRole("columnheader", {
-      name: "Daily staff-shift workload equivalents",
+      name: "Staff-shifts under your assumption",
     }),
   ).toBeVisible();
   expect(screen.getByText(/Per-shift headcount unavailable/)).toBeVisible();

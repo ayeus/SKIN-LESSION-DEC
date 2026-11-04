@@ -138,10 +138,12 @@ const guides: Record<
     tutorial: "T7",
     title: "Forecast the public daily admissions series",
     purpose:
-      "Compare time-based forecasting methods against later observed counts.",
+      "Estimate future daily admissions, compare forecasting methods, and explain how far past predictions missed.",
     steps: [
       "Select the preloaded UKHSA England COVID admissions dataset.",
       "Use date for Date column, count for Observed count column, and 7 for Horizon.",
+      "After running, read the daily estimate and past-error range; use the summary cards for the forecast period and highest estimated day.",
+      "In the model comparison, MAE is the typical size of a miss and RMSE penalizes especially large misses. Lower is better.",
       "Leave staffing fields empty unless you have approved operational assumptions.",
     ],
     inputs: [
@@ -152,15 +154,17 @@ const guides: Record<
   overview: {
     tutorial: "T8",
     title: "Summarize observed healthcare records",
-    purpose: "Count source rows and explore mapped time or category summaries.",
+    purpose:
+      "Count the selected source records, describe monthly totals, and compare recorded categories.",
     steps: [
       "For a quick example, choose MIMIC-IV public demo 2.2: admissions.",
       "To chart monthly admissions, set Date column to admittime.",
       'Set Advanced parameters to {"date_format":"%Y-%m-%d %H:%M:%S"}; leave count blank to count source rows.',
+      "After running, read Rows included and Calculated total first; then compare the monthly and category summaries.",
     ],
     inputs: [
-      "You can set Group column to admission_type to compare recorded categories.",
-      "A source-row count is not automatically a unique patient count or hospital-wide statistic.",
+      "The output shows each mapped source column, total-by-category table, and share of the calculated total.",
+      "A source-row count is not automatically a unique patient count or hospital-wide statistic; one person may have multiple records.",
       "Start and end dates are optional filters on the observed records.",
     ],
   },
