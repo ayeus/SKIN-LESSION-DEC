@@ -13,6 +13,9 @@ import ForecastEvidence from "./components/forecast-evidence";
 import AccountLogin from "./components/account-login";
 import AccountPanel from "./components/account-panel";
 import DatasetExplorer from "./components/dataset-explorer";
+import AdultWeightEvidence, {
+  adultWeightFeatureLabel,
+} from "./components/adult-weight-evidence";
 import { useEffect, useRef, useState, FormEvent } from "react";
 import {
   Activity,
@@ -353,6 +356,7 @@ export function Results({
         <span className="badge green">Calculated from your input</span>
       </div>
       {r.limitation && <p className="notice">{r.limitation}</p>}
+      <AdultWeightEvidence result={r} />
       {r.image && (
         <div className="image-grid">
           {[
@@ -493,7 +497,10 @@ export function Results({
         const v = value as any;
         return (
           <div key={name}>
-            <h3>{name}: observed distribution</h3>
+            <h3>
+              {r.model ? adultWeightFeatureLabel(name) : name}: observed
+              distribution
+            </h3>
             <Chart
               data={v.counts.map((count: number, i: number) => ({
                 index: Number(v.edges[i].toPrecision(3)),
@@ -512,14 +519,22 @@ export function Results({
         />
       )}
       {r.predicted && (
-        <Chart
-          data={r.predicted.map((v: number, i: number) => ({
-            index: i,
-            predicted: v,
-            observed: r.observed[i],
-          }))}
-          keys={["observed", "predicted"]}
-        />
+        <>
+          <h3>Observed BMI vs predicted BMI on held-out adults</h3>
+          <p>
+            Each point is one test record. The two lines show observed and
+            predicted BMI values in kg/m²; closer values indicate smaller
+            prediction errors.
+          </p>
+          <Chart
+            data={r.predicted.map((v: number, i: number) => ({
+              index: i + 1,
+              predicted: v,
+              observed: r.observed[i],
+            }))}
+            keys={["observed", "predicted"]}
+          />
+        </>
       )}
       {r.before && (
         <div className="metrics">

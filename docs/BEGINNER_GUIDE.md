@@ -114,7 +114,7 @@ This public corpus contains published case reports, not your hospital notes. Do 
 
 2. Select **Execute analysis**.
 
-The report includes descriptive data and a held-out model comparison, residual checks, feature importance, and sensitivity analysis. Do not include `participant_id` or BMI itself as an input feature. This is unweighted observational research; it does not prove that a behavior causes weight change.
+The results explain each number beside it: **MAE** is average prediction error in BMI points; **RMSE** is a similar error measure that penalizes large misses more; **R²** compares model fit with predicting the test-sample average (negative means that simple average would do better). The page also labels the observed-vs-predicted BMI graph, model comparison, shuffled-feature importance, leave-one-feature-out sensitivity, correlations, and residuals in plain language. Do not include `participant_id` or BMI itself as an input feature. This is unweighted observational research; it does not prove that a behavior causes weight change.
 
 ## If something does not work
 

@@ -147,3 +147,8 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - The browser suite was timing out because sidebar links include visible tutorial badges in their accessible names; locators now match the visible link label while permitting the badge. The image test now explicitly selects its synthetic test upload after the UI added the built-in sample default. The processing-method select now has an explicit form name and accessible label.
 - Playwright's isolated frontend server now uses a dedicated `.next-e2e` build directory so local browser verification does not contend with an already-running presentation server.
 - Verified locally: `.venv/bin/python -m scripts.check_postgres` — **36 PostgreSQL-backed tests passed**; `cd frontend && npm run test:browser` — **8 passed** across desktop and mobile, including real algorithm execution and accessibility scans. The full existing backend suite and frontend component/type/build checks were already green on this code except for these CI-only issues.
+
+## T14–T15 result explanations — 2026-11-04
+
+- Added plain-language labels and explanations for held-out BMI MAE, RMSE, R², model comparison, permutation importance, feature-removal sensitivity, feature correlations and residuals. Histograms and the observed/predicted graph now use understandable descriptions and BMI units. Values still come only from the completed analysis report.
+- `cd frontend && npm run typecheck`: passed. `npm test -- --run`: **29 passed** across 10 files, including a synthetic UI-format fixture that checks labels and disclosures, not clinical results.
