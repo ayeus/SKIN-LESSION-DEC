@@ -152,3 +152,10 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 
 - Added plain-language labels and explanations for held-out BMI MAE, RMSE, R², model comparison, permutation importance, feature-removal sensitivity, feature correlations and residuals. Histograms and the observed/predicted graph now use understandable descriptions and BMI units. Values still come only from the completed analysis report.
 - `cd frontend && npm run typecheck`: passed. `npm test -- --run`: **29 passed** across 10 files, including a synthetic UI-format fixture that checks labels and disclosures, not clinical results.
+
+## T10–T12 result explanations and runnable defaults — 2026-11-04
+
+- Added readable T10 grouping counts and top words; held-out classification metrics, explanations and example label comparisons; plain-language T11 entity labels/negation; and T12 ranked excerpts with score caveats. Contextual candidate tables now have explicit rank and score headings.
+- Defaults select the published-text corpus for clustering/search/NER and the gold labeled-context corpus for classification/context-label ranking. K-means (2 groups), BM25, existing text/label columns, document-aware splitting, and the starter search query are populated.
+- Executed the actual local MACCROBAT data through clustering (200 narratives), grouped labeled-context classification (11,441 rows; 8,548 training/2,893 held-out), BM25 search, context-label ranking, and configured NER (200 narratives, 23,230 recognized spans). Each returned real output. NER initially shows five text samples, with remaining samples expandable.
+- `cd frontend && npm run typecheck`: passed. `npm test -- --run`: **32 passed** across 11 files. `DERMA_E2E=1 npm run build`: passed. UI fixture texts are synthetic tests only, not clinical research results.

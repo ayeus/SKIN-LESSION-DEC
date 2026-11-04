@@ -87,10 +87,10 @@ The result counts rows in this demo table. It is not a hospital-wide total or an
 
 Open **Clinical text analytics (T10–T12)**. The public MACCROBAT case-report corpus is already loaded.
 
-- **Cluster documents (T10):** this is selected by default with `MACCROBAT2020: published clinical case reports` and text column `text`.
-- **Classify labeled text (T10):** changing Task automatically selects `MACCROBAT2020: gold mention semantic-type contexts`, uses genuine `text` and `label` columns, and sets document-aware grouping to `{"group_column":"document_id"}`.
-- **Clinical NER (T11):** choose that task and a compatible text dataset; inspect the extracted spans and review the model evidence panel.
-- **Search and rank (T12):** choose search, use the `text` column, and enter a real query. The terminology panel needs an ambiguous term plus its real context.
+- **Cluster documents (T10):** this is selected by default with `MACCROBAT2020: published clinical case reports`. K-means and two groups are prefilled. The output explains each group count, common words, and the group-separation score. Group numbers are names, not diagnoses.
+- **Classify labeled text (T10):** changing Task selects `MACCROBAT2020: gold mention semantic-type contexts`, uses `text` and `label`, and sets document-aware grouping to `{"group_column":"document_id"}`. The output defines accuracy, precision, recall, and F1, then compares the dataset label with the model label on held-out text examples.
+- **Clinical NER (T11):** choose that task. The compatible public case reports and selected local model are ready. It highlights recognized text and translates entity labels, such as `Sign_symptom`, to readable names. Review the model limitations; extracted terms are not verified medical facts.
+- **Search and rank (T12):** choose search. BM25, `text`, and the starter query `patient` are prefilled. The output lists ranked excerpts and explains that BM25 scores are text matches, not probabilities or diagnoses. The separate terminology panel needs a real term and context supplied by you.
 
 This public corpus contains published case reports, not your hospital notes. Do not paste identifiable clinical notes.
 

@@ -37,7 +37,7 @@ it("highlights exact character spans and safely escapes source markup", () => {
   );
   expect(container.querySelector("mark")?.textContent).toBe("rash");
   expect(container.querySelector("script")).toBeNull();
-  expect(screen.getByText(/negation: unknown/)).toBeInTheDocument();
+  expect(screen.getByText(/Negation was not determined/)).toBeInTheDocument();
   rerender(
     <EntityDocument
       text="rash"

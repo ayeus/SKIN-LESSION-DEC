@@ -183,16 +183,16 @@ const guides: Record<
     tutorial: "T10–T12",
     title: "Explore the public clinical-text examples",
     purpose:
-      "Cluster documents, classify texts with genuine labels, extract entities, and rank search results.",
+      "Group similar documents, check held-out text labels, highlight recognized medical terms, and search the public corpus.",
     steps: [
-      "Cluster is selected with the published MACCROBAT case reports. Change Task to search or classification as needed; the matching dataset is selected automatically.",
-      "For classification, the app selects MACCROBAT gold mention contexts and defaults to text, label, and document-aware grouping.",
-      "For NER, choose Clinical NER (model required) and review extracted spans. Use the terminology panel for contextual term ranking.",
+      "Cluster is selected by default. Run it to see document counts and common words for each group.",
+      "Classification, search and NER use preloaded corpus text and matching columns. Their result panels explain scores, labels and outputs.",
+      "Search defaults to BM25 and the query “patient”. Choose Clinical NER to see recognized spans and plain-language entity types.",
     ],
     inputs: [
-      'For classification, set Advanced parameters to {"group_column":"document_id"} to keep source documents together.',
+      "Classification keeps excerpts from the same source document in one split. Its test examples show the dataset label beside the model label.",
       "The corpus contains published case reports, not hospital notes. Do not paste identifiable patient notes.",
-      "Search needs a real query; terminology ranking needs an ambiguous term and its actual context.",
+      "The separate terminology panel needs an actual term and context from you; those values should not be invented.",
     ],
   },
   reduce: {

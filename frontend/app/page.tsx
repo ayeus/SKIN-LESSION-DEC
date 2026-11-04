@@ -3,7 +3,6 @@ import PlanningEvidence from "./components/planning-evidence";
 import SegmentationEvidence from "./components/segmentation-evidence";
 import TerminologyPanel from "./components/terminology-panel";
 import SenseEvidence from "./components/sense-evidence";
-import EntityDocument from "./components/entity-document";
 import TrainingHistory from "./components/training-history";
 import ClinicalModelPanel from "./components/clinical-model-panel";
 import SectionGuide, { StartHere } from "./components/section-guides";
@@ -16,6 +15,7 @@ import DatasetExplorer from "./components/dataset-explorer";
 import AdultWeightEvidence, {
   adultWeightFeatureLabel,
 } from "./components/adult-weight-evidence";
+import ClinicalTextEvidence from "./components/clinical-text-evidence";
 import { useEffect, useRef, useState, FormEvent } from "react";
 import {
   Activity,
@@ -127,7 +127,7 @@ function defaultDatasetForPage(
 ) {
   const preferred =
     page === "text"
-      ? textTask === "classify"
+      ? ["classify", "disambiguate"].includes(textTask)
         ? "gold mention semantic-type contexts"
         : "published clinical case reports"
       : ["forecast", "planning"].includes(page)
@@ -156,8 +156,14 @@ function defaultDatasetForPage(
 function defaultParametersForPage(page: string, textTask = "cluster") {
   if (page === "overview")
     return JSON.stringify({ date_format: "%Y-%m-%d %H:%M:%S" }, null, 2);
-  if (page === "text" && textTask === "classify")
-    return JSON.stringify({ group_column: "document_id" }, null, 2);
+  if (page === "text") {
+    if (textTask === "cluster")
+      return JSON.stringify({ method: "kmeans", clusters: 2 }, null, 2);
+    if (textTask === "search")
+      return JSON.stringify({ method: "bm25" }, null, 2);
+    if (["classify", "disambiguate"].includes(textTask))
+      return JSON.stringify({ group_column: "document_id" }, null, 2);
+  }
   return "{}";
 }
 const modules = [
@@ -481,13 +487,7 @@ export function Results({
           )}
         </>
       )}
-      {r.documents &&
-        r.documents.map((d: any, i: number) => (
-          <article key={i}>
-            <h3>Document {i}</h3>
-            <EntityDocument text={d.text} entities={d.entities} />
-          </article>
-        ))}
+      <ClinicalTextEvidence result={r} />
       {Object.entries(
         r.histograms ||
           r.profile?.histograms ||
@@ -549,14 +549,6 @@ export function Results({
           </div>
         </div>
       )}
-      {r.results?.map((v: any) => (
-        <article key={v.document_index}>
-          <strong>
-            Document {v.document_index} · score {v.score.toFixed(3)}
-          </strong>
-          <p>{v.text}</p>
-        </article>
-      ))}
       {r.explanation?.overlay && (
         <figure>
           <img
@@ -1726,6 +1718,11 @@ export default function Home() {
                                 setParameters(
                                   defaultParametersForPage("text", task),
                                 );
+                                setTextQuery(
+                                  ["search", "disambiguate"].includes(task)
+                                    ? "patient"
+                                    : "",
+                                );
                               }}
                             >
                               <option value="cluster">Cluster documents</option>
@@ -1754,7 +1751,9 @@ export default function Home() {
                             <input name="label_column" defaultValue="label" />
                           </label>
                           <label>
-                            Search query
+                            {textTask === "disambiguate"
+                              ? "Context text to rank"
+                              : "Search query"}
                             <input
                               name="query"
                               value={textQuery}

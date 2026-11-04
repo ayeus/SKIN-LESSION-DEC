@@ -1,9 +1,14 @@
 type Data = Record<string, any>;
 export default function SenseEvidence({ result: r }: { result: Data }) {
   if (!r.sense_candidates) return null;
+  const scoreLabel = r.sense_candidates.some(
+    (candidate: Data) => typeof candidate.context_similarity === "number",
+  )
+    ? "Text-match score"
+    : "Model ranking score";
   return (
     <section aria-label="Contextual candidate evidence">
-      <h3>Contextual candidates for review</h3>
+      <h3>Possible meanings ranked for review</h3>
       <p>{r.status || r.resolution}</p>
       {r.inventory && (
         <p>
@@ -20,10 +25,11 @@ export default function SenseEvidence({ result: r }: { result: Data }) {
           <table>
             <thead>
               <tr>
-                <th>Candidate</th>
+                <th>Rank</th>
+                <th>Possible meaning</th>
                 <th>Source definition</th>
-                <th>Research score</th>
-                <th>Shared context terms</th>
+                <th>{scoreLabel} (not certainty)</th>
+                <th>Words shared with the context</th>
               </tr>
             </thead>
             <tbody>
@@ -32,6 +38,7 @@ export default function SenseEvidence({ result: r }: { result: Data }) {
                   candidate.context_similarity ?? candidate.uncalibrated_score;
                 return (
                   <tr key={candidate.id || index}>
+                    <td>Rank {index + 1}</td>
                     <td>
                       {candidate.label || candidate.sense}
                       {candidate.id && /^D\d+$/.test(candidate.id) && (
@@ -50,7 +57,7 @@ export default function SenseEvidence({ result: r }: { result: Data }) {
                     <td>{candidate.definition || "Definition not supplied"}</td>
                     <td>
                       {typeof score === "number" && Number.isFinite(score)
-                        ? score.toFixed(4)
+                        ? score.toFixed(3)
                         : "Not recorded"}
                     </td>
                     <td>
@@ -66,10 +73,10 @@ export default function SenseEvidence({ result: r }: { result: Data }) {
       ) : (
         <p>No source candidates found. No arbitrary sense was substituted.</p>
       )}
-      <p>
-        Scores are lexical similarity or uncalibrated classifier scores, not
-        clinical confidence. Recognition and ranking do not verify clinical
-        facts.
+      <p className="notice">
+        Candidates are ordered from best text match to lower text match for this
+        input. The score is not a probability or clinical confidence, and
+        ranking does not verify a medical fact.
       </p>
     </section>
   );

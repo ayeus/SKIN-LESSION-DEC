@@ -6,6 +6,23 @@ type Entity = {
   negated: boolean | null;
   uncertainty?: string;
 };
+const entityLabels: Record<string, string> = {
+  Disease_disorder: "Disease or disorder",
+  Sign_symptom: "Symptom or sign",
+  Medication: "Medication",
+  Anatomical_site: "Body part or location",
+  Procedure: "Medical procedure",
+  Lab_value: "Lab test or value",
+  Date: "Date or time",
+};
+const readableLabel = (value: string) =>
+  entityLabels[value] || value.replaceAll("_", " ");
+const negationText = (value: boolean | null) =>
+  value === true
+    ? "The model marked this mention as negated."
+    : value === false
+      ? "The model did not mark this mention as negated."
+      : "Negation was not determined.";
 export default function EntityDocument({
   text,
   entities,
@@ -34,7 +51,7 @@ export default function EntityDocument({
       pieces.push(
         <mark
           key={i}
-          title={`${e.label}; negation: ${e.negated === null ? "unknown" : e.negated}`}
+          title={`${readableLabel(e.label)}; ${negationText(e.negated)}`}
           style={{ padding: "1px 2px" }}
         >
           {text.slice(e.start, e.end)}
@@ -53,15 +70,22 @@ export default function EntityDocument({
           without unreliable highlights.
         </p>
       )}
-      <ul>
-        {ordered.map((e, i) => (
-          <li key={i}>
-            <strong>{e.text}</strong> {e.label} (characters {e.start}–{e.end});
-            negation: {e.negated === null ? "unknown" : String(e.negated)}.{" "}
-            {e.uncertainty}
-          </li>
-        ))}
-      </ul>
+      {ordered.length ? (
+        <ul>
+          {ordered.map((e, i) => (
+            <li key={i}>
+              <strong>{e.text}</strong> — {readableLabel(e.label)}.{" "}
+              {negationText(e.negated)}{" "}
+              <small>
+                Text position: characters {e.start}–{e.end}.
+                {e.uncertainty ? ` ${e.uncertainty}.` : ""}
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No terms were recognized in this text by the configured model.</p>
+      )}
     </>
   );
 }
