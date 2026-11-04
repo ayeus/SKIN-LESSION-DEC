@@ -145,7 +145,7 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
               type="number"
               min={1}
               max={1000}
-              defaultValue={5}
+              defaultValue={1}
               required
               disabled={active}
             />
@@ -157,7 +157,7 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
               type="number"
               min={1}
               max={128}
-              defaultValue={16}
+              defaultValue={32}
               required
               disabled={active}
             />

@@ -44,9 +44,9 @@ const guides: Record<
     tutorial: "T2–T3",
     title: "Clean a table without changing its source",
     purpose:
-      "Review types, missing values and duplicates, then record only the transformations you choose.",
+      "The MIMIC admissions table is selected as a ready example. Review types, missing values and duplicates before running.",
     steps: [
-      "Choose a source dataset from the list.",
+      "The MIMIC-IV admissions example is selected; choose another registered table only if you want.",
       "Read the available column names and types shown below the selector.",
       "Open Transformation configuration guide for settings; use actual column names and run the analysis.",
     ],
@@ -60,14 +60,14 @@ const guides: Record<
     tutorial: "T4",
     title: "Run an image-processing method",
     purpose:
-      "Upload an image and compare its real algorithm output, mask and measurements.",
+      "A real public ISIC practice image and fast CLAHE method are ready by default.",
     steps: [
-      "Choose a PNG, JPEG or WebP image up to 20 MiB.",
-      "Choose a processing method. Learned segmentation is available when the selected U-Net is ready.",
-      "Keep the parameters as {} for the first run, then choose Run image processing.",
+      "The built-in ISIC image is selected; choose your own image from Image source if needed.",
+      "CLAHE is selected as a quick first method. Other image methods remain available.",
+      "The parameter defaults are ready. Choose Run image processing.",
     ],
     inputs: [
-      "A project image for practice: data/raw/isic2018-task3/images/ISIC_0024309.jpg.",
+      "The local public example is data/raw/isic2018-task3/images/ISIC_0024309.jpg.",
       "Optional reference masks are for comparing segmentation only; they are not diagnoses.",
       "The original image and generated output are kept in local run history; avoid identifiable patient images.",
     ],
@@ -109,7 +109,7 @@ const guides: Record<
     purpose:
       "The model scores the uploaded image against its seven learned dataset classes.",
     steps: [
-      "Choose a PNG, JPEG or WebP image up to 20 MiB.",
+      "The built-in ISIC research image is selected; use Image source to pick your own instead.",
       "Optionally check Compute actual Grad-CAM explanation.",
       "Leave score retention unchecked for an ephemeral run, then choose Run research inference.",
     ],
@@ -185,8 +185,8 @@ const guides: Record<
     purpose:
       "Cluster documents, classify texts with genuine labels, extract entities, and rank search results.",
     steps: [
-      "For clustering or search, choose MACCROBAT2020: published clinical case reports; text column is text.",
-      "For classification, choose MACCROBAT2020: gold mention semantic-type contexts; use text and label.",
+      "Cluster is selected with the published MACCROBAT case reports. Change Task to search or classification as needed; the matching dataset is selected automatically.",
+      "For classification, the app selects MACCROBAT gold mention contexts and defaults to text, label, and document-aware grouping.",
       "For NER, choose Clinical NER (model required) and review extracted spans. Use the terminology panel for contextual term ranking.",
     ],
     inputs: [
@@ -201,7 +201,7 @@ const guides: Record<
     purpose:
       "PCA or t-SNE turns selected numeric columns into coordinates for exploratory visualization.",
     steps: [
-      "Choose NHANES 2017–2018 adults.",
+      "NHANES 2017–2018 adults is selected by default.",
       "Use age_years_topcoded80, female_reported, sedentary_minutes_day, sleep_weekday_hours_exact, meals_away_week_exact.",
       "Choose PCA and 3D for the simplest first run, then select Execute analysis.",
     ],
@@ -216,7 +216,7 @@ const guides: Record<
     purpose:
       "Review descriptive data, then test how well selected observations predict BMI.",
     steps: [
-      "Choose NHANES 2017–2018 adults.",
+      "NHANES 2017–2018 adults is selected by default.",
       "For Numeric feature columns, enter age_years_topcoded80, female_reported, sedentary_minutes_day, sleep_weekday_hours_exact, meals_away_week_exact.",
       "Set Observed numeric outcome to bmi_kg_m2 and choose Execute analysis.",
     ],

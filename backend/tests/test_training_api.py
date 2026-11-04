@@ -31,6 +31,33 @@ def test_missing_dataset_blocks_and_does_not_promote(monkeypatch, tmp_path):
         assert client.post("/models/select/not-present", headers=H).status_code == 404
 
 
+def test_public_practice_image_endpoint_uses_only_fixed_server_path(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+    from backend.app import main as main_module
+
+    images = tmp_path / "images"
+    images.mkdir()
+    Image.new("RGB", (12, 12), color=(32, 96, 144)).save(
+        images / "ISIC_0024309.jpg"
+    )
+    monkeypatch.setattr(
+        main_module.training,
+        "source_paths",
+        lambda: (tmp_path / "metadata.csv", images),
+    )
+    with TestClient(app) as client:
+        assert client.get("/demo/lesion-image").status_code == 401
+        response = client.get("/demo/lesion-image", headers=H)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["content-disposition"].endswith(
+            'filename="ISIC_0024309.jpg"'
+        )
+        assert len(response.content) > 100
+
+
 def test_active_training_can_be_stopped_and_persists_cancelled(monkeypatch, tmp_path):
     import threading
     import time

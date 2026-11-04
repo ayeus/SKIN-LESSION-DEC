@@ -643,6 +643,25 @@ def current_model(_: Protected):
     }
 
 
+@app.get("/demo/lesion-image")
+def demo_lesion_image(user: Protected):
+    """Serve one fixed, public ISIC practice image; never accept a client path."""
+    _metadata_path, images_path = training.source_paths()
+    path = images_path / "ISIC_0024309.jpg"
+    if not path.is_file():
+        raise HTTPException(
+            409,
+            "The built-in ISIC practice image is unavailable; choose an image file instead.",
+        )
+    audit("public_demo_image_read", path.name, user.id)
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        filename=path.name,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 training_slot = BoundedSemaphore(1)
 
 

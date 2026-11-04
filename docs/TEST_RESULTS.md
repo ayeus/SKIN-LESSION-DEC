@@ -133,3 +133,10 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - Backend: `.venv/bin/python -m pytest backend/tests -q` — **107 passed**, one visible upstream Starlette/AnyIO deprecation warning. Python compile check passed.
 - Frontend: `cd frontend && npm run typecheck`, `npm test` — **28 passed**, and `npm run build` all passed.
 - Live browser confirmed the Stop control's location and disabled no-active state; component and API integration tests verified active-run discovery, cancellation request, and persisted cancelled status. Screenshot: `docs/screenshots/cnn-stop-control.png`.
+
+## Presentation quick-start defaults — 2026-11-04
+
+- `.venv/bin/python -m pytest backend/tests -q`: **108 passed**, one upstream Starlette/AnyIO deprecation warning.
+- `cd frontend && npm test -- --run`: **28 passed** across 9 files; `npm run typecheck`: passed; `npm run build`: passed.
+- Live API checks: health 200, 13 real registered datasets, lesion and segmentation model availability both true, zero active jobs. Authenticated sample-image route returned the public ISIC JPEG (200); frontend `/api/demo/lesion-image` proxy also returned 200. Actual ephemeral CNN inference returned 200 without retention; actual CLAHE processing returned a completed result. No training was started.
+- `git diff --check`: passed. No test run used application mock observations; the synthetic image in the route unit test is confined to that test fixture.

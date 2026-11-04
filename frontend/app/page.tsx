@@ -115,6 +115,48 @@ function labelForRun(kind: string) {
   };
   return labels[kind] || kind.replaceAll("_", " ");
 }
+const NHANES_FEATURES =
+  "age_years_topcoded80,female_reported,sedentary_minutes_day,sleep_weekday_hours_exact,meals_away_week_exact";
+function defaultDatasetForPage(
+  page: string,
+  datasets: Dataset[],
+  textTask = "cluster",
+) {
+  const preferred =
+    page === "text"
+      ? textTask === "classify"
+        ? "gold mention semantic-type contexts"
+        : "published clinical case reports"
+      : ["forecast", "planning"].includes(page)
+        ? "ukhsa england covid admissions"
+        : ["reduce", "research"].includes(page)
+          ? "nhanes 2017–2018 adults"
+          : ["overview", "preprocess"].includes(page)
+            ? "mimic-iv public demo 2.2: admissions"
+            : "";
+  const match = preferred
+    ? datasets.find((dataset) => dataset.name.toLowerCase().includes(preferred))
+    : undefined;
+  if (match) return match.id;
+  const modality =
+    page === "text"
+      ? "clinical_text"
+      : ["forecast", "planning"].includes(page)
+        ? "demand"
+        : ["reduce", "research"].includes(page)
+          ? "weight"
+          : ["overview", "preprocess"].includes(page)
+            ? "ehr"
+            : "";
+  return datasets.find((dataset) => dataset.modality === modality)?.id || "";
+}
+function defaultParametersForPage(page: string, textTask = "cluster") {
+  if (page === "overview")
+    return JSON.stringify({ date_format: "%Y-%m-%d %H:%M:%S" }, null, 2);
+  if (page === "text" && textTask === "classify")
+    return JSON.stringify({ group_column: "document_id" }, null, 2);
+  return "{}";
+}
 const modules = [
   {
     id: "dashboard",
@@ -658,7 +700,10 @@ export default function Home() {
     [query, setQuery] = useState(""),
     [runSearch, setRunSearch] = useState(""),
     [runCategory, setRunCategory] = useState("all"),
-    [inspectingRun, setInspectingRun] = useState("");
+    [inspectingRun, setInspectingRun] = useState(""),
+    [textTask, setTextTask] = useState("cluster"),
+    [textQuery, setTextQuery] = useState("patient"),
+    [usePracticeImage, setUsePracticeImage] = useState(true);
   const resultsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (result && (page === "reports" || page === "visualization")) {
@@ -717,15 +762,22 @@ export default function Home() {
     if (token) void refresh();
   }, [token]);
   useEffect(() => {
+    if (!selected) {
+      const preferred = defaultDatasetForPage(page, datasets, textTask);
+      if (preferred) setSelected(preferred);
+    }
+  }, [page, datasets, textTask]);
+  useEffect(() => {
     function restoreModule() {
       const id = window.location.hash.slice(1);
       if (modules.some((module) => module.id === id)) {
         setPage(id);
         setResult(null);
         setError("");
-        setParameters("{}");
+        setParameters(defaultParametersForPage(id, textTask));
         setMobile(false);
-        setSelected("");
+        setSelected(defaultDatasetForPage(id, datasets, textTask));
+        setUsePracticeImage(["image", "inference"].includes(id));
       }
     }
     restoreModule();
@@ -742,9 +794,19 @@ export default function Home() {
     setPage(id);
     setResult(null);
     setError("");
-    setParameters("{}");
+    setParameters(defaultParametersForPage(id, "cluster"));
     setMobile(false);
-    setSelected(datasetId || "");
+    setSelected(
+      datasetId ||
+        defaultDatasetForPage(
+          id,
+          datasets,
+          id === "text" ? "cluster" : textTask,
+        ),
+    );
+    setTextTask("cluster");
+    setTextQuery("patient");
+    setUsePracticeImage(["image", "inference"].includes(id));
   }
   async function submit(e: FormEvent<HTMLFormElement>, type: string) {
     e.preventDefault();
@@ -757,6 +819,27 @@ export default function Home() {
       if (type === "datasets") {
         output = await api("/datasets", { method: "POST", body: fd });
       } else if (["image", "registration", "inference"].includes(type)) {
+        if (["image", "inference"].includes(type) && usePracticeImage) {
+          const imageResponse = await fetch("/api/demo/lesion-image", {
+            headers: { Authorization: "Bearer " + token },
+          });
+          if (!imageResponse.ok) {
+            let detail = "The built-in image could not be loaded.";
+            try {
+              const body = await imageResponse.json();
+              if (typeof body.detail === "string") detail = body.detail;
+            } catch {}
+            throw new Error(detail);
+          }
+          const imageBlob = await imageResponse.blob();
+          fd.delete("file");
+          fd.append(
+            "file",
+            new File([imageBlob], "ISIC_0024309.jpg", {
+              type: "image/jpeg",
+            }),
+          );
+        }
         if (type === "image") {
           fd.set("method", method);
           fd.set("parameters", parameters);
@@ -1275,15 +1358,56 @@ export default function Home() {
                           PNG, JPEG or WebP · up to 20 MiB · no patient
                           identifiers
                         </p>
-                        <label>
-                          {page === "registration" ? "First image" : "Image"}
-                          <input
-                            name={page === "registration" ? "first" : "file"}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            required
-                          />
-                        </label>
+                        {page === "registration" ? (
+                          <label>
+                            First image
+                            <input
+                              name="first"
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              required
+                            />
+                          </label>
+                        ) : (
+                          <>
+                            <label>
+                              Image source
+                              <select
+                                value={usePracticeImage ? "sample" : "upload"}
+                                onChange={(event) =>
+                                  setUsePracticeImage(
+                                    event.target.value === "sample",
+                                  )
+                                }
+                              >
+                                <option value="sample">
+                                  Built-in ISIC 2018 practice image
+                                </option>
+                                <option value="upload">
+                                  Choose my own image
+                                </option>
+                              </select>
+                            </label>
+                            {usePracticeImage ? (
+                              <p className="notice">
+                                Ready to run with ISIC_0024309.jpg, a public
+                                research image. It was in this model&apos;s
+                                held-out image split; this presentation example
+                                is not an independent evaluation.
+                              </p>
+                            ) : (
+                              <label>
+                                Image file
+                                <input
+                                  name="file"
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  required
+                                />
+                              </label>
+                            )}
+                          </>
+                        )}
                         {page === "registration" && (
                           <label>
                             Second image
@@ -1573,7 +1697,20 @@ export default function Home() {
                         <div className="form-grid">
                           <label>
                             Task
-                            <select name="task">
+                            <select
+                              name="task"
+                              value={textTask}
+                              onChange={(event) => {
+                                const task = event.target.value;
+                                setTextTask(task);
+                                setSelected(
+                                  defaultDatasetForPage("text", datasets, task),
+                                );
+                                setParameters(
+                                  defaultParametersForPage("text", task),
+                                );
+                              }}
+                            >
                               <option value="cluster">Cluster documents</option>
                               <option value="classify">
                                 Classify labeled notes
@@ -1601,7 +1738,13 @@ export default function Home() {
                           </label>
                           <label>
                             Search query
-                            <input name="query" />
+                            <input
+                              name="query"
+                              value={textQuery}
+                              onChange={(event) =>
+                                setTextQuery(event.target.value)
+                              }
+                            />
                           </label>
                         </div>
                       )}
@@ -1609,7 +1752,10 @@ export default function Home() {
                         <div className="form-grid">
                           <label>
                             Optional date column
-                            <input name="date_column" />
+                            <input
+                              name="date_column"
+                              defaultValue="admittime"
+                            />
                           </label>
                           <label>
                             Optional observed count column
@@ -1617,7 +1763,10 @@ export default function Home() {
                           </label>
                           <label>
                             Optional grouping column
-                            <input name="group_column" />
+                            <input
+                              name="group_column"
+                              defaultValue="admission_type"
+                            />
                           </label>
                           <label>
                             Start date
@@ -1692,7 +1841,11 @@ export default function Home() {
                         <div className="form-grid">
                           <label>
                             Numeric feature columns (comma separated)
-                            <input name="features" required />
+                            <input
+                              name="features"
+                              defaultValue={NHANES_FEATURES}
+                              required
+                            />
                           </label>
                           {page === "reduce" ? (
                             <>
@@ -1708,6 +1861,7 @@ export default function Home() {
                                 <select
                                   name="dimensions"
                                   aria-label="Embedding dimensions"
+                                  defaultValue="3"
                                 >
                                   <option value="2">2D</option>
                                   <option value="3">3D</option>
@@ -1717,7 +1871,11 @@ export default function Home() {
                           ) : (
                             <label>
                               Observed numeric outcome
-                              <input name="target" required />
+                              <input
+                                name="target"
+                                defaultValue="bmi_kg_m2"
+                                required
+                              />
                             </label>
                           )}
                         </div>

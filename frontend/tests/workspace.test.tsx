@@ -91,8 +91,11 @@ it("shows missing operational inputs instead of fabricated demand", async () => 
 it("validates image upload and clears data when workspace is locked", async () => {
   const user = await unlock();
   await user.click(screen.getByRole("link", { name: /Image processing lab/ }));
-  expect(screen.getByLabelText("Image", { exact: true })).toBeRequired();
-  expect(screen.getByLabelText("Image", { exact: true })).toHaveAttribute(
+  expect(screen.getByLabelText("Image source")).toHaveValue("sample");
+  expect(screen.getAllByText(/ISIC_0024309.jpg/).length).toBeGreaterThan(0);
+  await user.selectOptions(screen.getByLabelText("Image source"), "upload");
+  expect(screen.getByLabelText("Image file")).toBeRequired();
+  expect(screen.getByLabelText("Image file")).toHaveAttribute(
     "accept",
     "image/png,image/jpeg,image/webp",
   );

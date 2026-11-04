@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 type Data = Record<string, any>;
 type Source = {
   id: string;
@@ -20,6 +20,18 @@ export default function DatasetExplorer({ datasets, api, onResult }: Props) {
     [busy, setBusy] = useState(false);
   const source = datasets.find((d) => d.id === selected);
   const ehr = datasets.filter((d) => d.modality === "ehr");
+  const defaultChild =
+    ehr.find((d) => d.name.toLowerCase().includes("admissions")) || ehr[0];
+  const defaultParent =
+    ehr.find((d) => d.name.toLowerCase().includes("patients")) || ehr[0];
+  useEffect(() => {
+    if (!selected && datasets.length) {
+      const initial =
+        datasets.find((d) => d.name.toLowerCase().includes("admissions")) ||
+        datasets[0];
+      setSelected(initial.id);
+    }
+  }, [datasets, selected]);
   async function load(offset = 0) {
     if (!selected) return;
     setBusy(true);
@@ -195,7 +207,11 @@ export default function DatasetExplorer({ datasets, api, onResult }: Props) {
             <div className="form-grid">
               <label>
                 Child EHR table
-                <select name="child_dataset_id" required>
+                <select
+                  name="child_dataset_id"
+                  defaultValue={defaultChild?.id}
+                  required
+                >
                   {ehr.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
@@ -208,12 +224,17 @@ export default function DatasetExplorer({ datasets, api, onResult }: Props) {
                 <input
                   name="child_key"
                   required
+                  defaultValue="subject_id"
                   placeholder="e.g. subject_id"
                 />
               </label>
               <label>
                 Parent EHR table
-                <select name="parent_dataset_id" required>
+                <select
+                  name="parent_dataset_id"
+                  defaultValue={defaultParent?.id}
+                  required
+                >
                   {ehr.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
@@ -226,6 +247,7 @@ export default function DatasetExplorer({ datasets, api, onResult }: Props) {
                 <input
                   name="parent_key"
                   required
+                  defaultValue="subject_id"
                   placeholder="e.g. subject_id"
                 />
               </label>
