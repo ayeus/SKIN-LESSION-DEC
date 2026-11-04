@@ -5,12 +5,16 @@ import userEvent from "@testing-library/user-event";
 import TrainingPanel from "../app/components/training-panel";
 
 it("blocks training when source images are missing", async () => {
-  const api = vi.fn(async () => ({
-    ready: false,
-    reason: "Image download/extraction is incomplete",
-    manifest_rows: 10,
-    missing_images: 10,
-  }));
+  const api = vi.fn(async (path: string) =>
+    path === "/runs"
+      ? []
+      : {
+          ready: false,
+          reason: "Image download/extraction is incomplete",
+          manifest_rows: 10,
+          missing_images: 10,
+        },
+  );
   render(<TrainingPanel api={api} onResult={vi.fn()} onChange={vi.fn()} />);
   expect(
     await screen.findByText("Image download/extraction is incomplete"),
@@ -25,6 +29,7 @@ it("polls actual job state and never selects a completed model without a user ac
   const api = vi.fn(async (path: string, init?: RequestInit) => {
     if (path === "/training/readiness")
       return { ready: true, manifest_rows: 20, missing_images: 0 };
+    if (path === "/runs") return [];
     if (path === "/training") {
       expect(JSON.parse(String(init?.body))).toMatchObject({
         architecture: "small_cnn",
@@ -77,13 +82,15 @@ it("shows persisted training failure instead of a successful result", async () =
   const api = vi.fn(async (path: string) =>
     path === "/training/readiness"
       ? { ready: true }
-      : path === "/training"
-        ? { id: "failed-fixture", status: "pending" }
-        : {
-            id: "failed-fixture",
-            status: "failed",
-            error: "Identical image bytes across different groups",
-          },
+      : path === "/runs"
+        ? []
+        : path === "/training"
+          ? { id: "failed-fixture", status: "pending" }
+          : {
+              id: "failed-fixture",
+              status: "failed",
+              error: "Identical image bytes across different groups",
+            },
   );
   const user = userEvent.setup();
   render(<TrainingPanel api={api} onResult={result} onChange={vi.fn()} />);
@@ -99,4 +106,43 @@ it("shows persisted training failure instead of a successful result", async () =
     "Identical image bytes across different groups",
   );
   expect(result).not.toHaveBeenCalled();
+});
+
+it("discovers an active run and stops it through the cancel API", async () => {
+  let cancelled = false;
+  const api = vi.fn(async (path: string) => {
+    if (path === "/training/readiness") return { ready: true };
+    if (path === "/runs")
+      return [{ id: "active-fixture", kind: "training", status: "running" }];
+    if (path === "/training/active-fixture/cancel") {
+      cancelled = true;
+      return {
+        id: "active-fixture",
+        status: "running",
+        cancel_requested: true,
+      };
+    }
+    if (path === "/runs/active-fixture")
+      return cancelled
+        ? {
+            id: "active-fixture",
+            kind: "training",
+            status: "cancelled",
+            error: "Stopped at the user's request",
+          }
+        : { id: "active-fixture", kind: "training", status: "running" };
+    throw new Error("Unexpected request " + path);
+  });
+  const user = userEvent.setup();
+  render(<TrainingPanel api={api} onResult={vi.fn()} onChange={vi.fn()} />);
+  await user.click(
+    await screen.findByRole("button", { name: "Stop training" }),
+  );
+  expect(api).toHaveBeenCalledWith("/training/active-fixture/cancel", {
+    method: "POST",
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Stopped at the user's request",
+  );
+  expect(screen.getByText(/Run active-fixture: cancelled/)).toBeVisible();
 });

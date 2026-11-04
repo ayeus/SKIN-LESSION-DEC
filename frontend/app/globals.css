@@ -981,6 +981,27 @@ main {
   border-radius: 10px;
   background: white;
 }
+.training-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+.stop-training {
+  border-color: #d8a8a3;
+  color: #8a342c;
+  background: #fff8f7;
+}
+.stop-training:not(:disabled):hover {
+  border-color: #a94c42;
+  color: white;
+  background: #a94c42;
+}
+.training-actions span {
+  color: var(--muted);
+  font-size: 12px;
+}
 .report-search {
   margin-top: 8px;
 }

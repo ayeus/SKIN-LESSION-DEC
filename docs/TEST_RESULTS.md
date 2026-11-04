@@ -124,3 +124,12 @@ See DATA_ACQUISITION.md for executed commands, source licenses, publisher checks
 - Live Chromium checked five category groups, forecast search (3 matching persisted runs), Images filter (31 persisted runs), Inspect loading a real result, and a 390px mobile viewport with no horizontal overflow. Capture: `docs/screenshots/t6-organized-library.png`.
 - Responding to the owner's stop request, confirmed a live CNN job at epoch 2/5 with the API process consuming CPU. The then-current server had no cancellation route, so its API process was stopped and restarted. Startup correctly marked the interrupted run failed with the recorded process-ended reason. API health returned 200 after restart; no training run remains active. No completion or model result is claimed for the interrupted run.
 - The web Playwright runner was not rerun; browser verification above used the live authenticated app and API directly.
+
+## CNN Stop control — 2026-11-04
+
+- The active CNN runs observed during this session were stopped by restarting the API because the previous server had no cancellation API. Startup marked interrupted runs failed with the process-ended explanation; this does not claim successful training. The restarted API reports no pending/running CNN jobs.
+- Added an admin-only audited `POST /training/{id}/cancel` endpoint backed by cooperative cancellation checks before data loading, after model setup, and between training/evaluation minibatches. Cancellation persists as `cancelled`; no model is selected or promoted.
+- The CNN training page now discovers a real active CNN run on entry. **Stop training** stays visible under Start; it is disabled when there is no active job and enabled for an active job.
+- Backend: `.venv/bin/python -m pytest backend/tests -q` — **107 passed**, one visible upstream Starlette/AnyIO deprecation warning. Python compile check passed.
+- Frontend: `cd frontend && npm run typecheck`, `npm test` — **28 passed**, and `npm run build` all passed.
+- Live browser confirmed the Stop control's location and disabled no-active state; component and API integration tests verified active-run discovery, cancellation request, and persisted cancelled status. Screenshot: `docs/screenshots/cnn-stop-control.png`.

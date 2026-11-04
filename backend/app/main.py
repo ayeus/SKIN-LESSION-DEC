@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 from typing import Literal
 from concurrent.futures import ThreadPoolExecutor
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Event, Lock
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -31,6 +31,12 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("dermainsight")
 executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="research-job")
 queue_slots = BoundedSemaphore(4)
+training_cancel_events: dict[str, Event] = {}
+training_cancel_lock = Lock()
+
+
+class TrainingCancelled(Exception):
+    """Raised cooperatively when an administrator stops a training run."""
 
 API_ACTIVE = False
 EXECUTOR_INSTANCE = str(uuid4())
@@ -179,11 +185,15 @@ def execute(kind, parameters, fn, dataset_id=None, run_id=None, owner_id=None):
         audit(kind, id, owner_id)
         return {"id": id, "status": "completed", "result": result}
     except Exception as e:
+        cancelled = isinstance(e, TrainingCancelled)
         with Session() as s:
             run = s.get(Run, id)
-            run.status = "failed"
+            run.status = "cancelled" if cancelled else "failed"
             run.error = str(e)
             s.commit()
+        if cancelled:
+            audit(kind + "_cancelled", id, owner_id)
+            return {"id": id, "status": "cancelled"}
         logger.info(
             json.dumps(
                 {
@@ -670,6 +680,7 @@ def start_training(body: TrainingRequest, _: Protected):
         raise HTTPException(429, "Research queue is full")
     id = str(uuid4())
     params = body.model_dump()
+    cancellation = Event()
     try:
         with Session() as s:
             s.add(
@@ -683,6 +694,8 @@ def start_training(body: TrainingRequest, _: Protected):
                 )
             )
             s.commit()
+        with training_cancel_lock:
+            training_cancel_events[id] = cancellation
 
         def worker():
             try:
@@ -691,6 +704,8 @@ def start_training(body: TrainingRequest, _: Protected):
                     from .services.ml import train
 
                     metadata, images = training.source_paths()
+                    if cancellation.is_set():
+                        raise TrainingCancelled("Stopped at the user's request")
 
                     def progress(epoch):
                         with Session() as s:
@@ -711,6 +726,7 @@ def start_training(body: TrainingRequest, _: Protected):
                         batch_size=body.batch_size,
                         pretrained=body.pretrained,
                         progress_callback=progress,
+                        cancel_check=cancellation.is_set,
                     )
                     return {
                         "manifest": manifest,
@@ -724,16 +740,40 @@ def start_training(body: TrainingRequest, _: Protected):
             except HTTPException:
                 pass  # execute persists and exposes failure; never convert to success.
             finally:
+                with training_cancel_lock:
+                    training_cancel_events.pop(id, None)
                 training_slot.release()
                 queue_slots.release()
 
         executor.submit(worker)
     except Exception:
+        with training_cancel_lock:
+            training_cancel_events.pop(id, None)
         training_slot.release()
         queue_slots.release()
         raise
     audit("training_submitted", id, _.id)
     return {"id": id, "status": "pending"}
+
+
+@app.post("/training/{id}/cancel")
+def cancel_training(id: str, _: Protected):
+    require_admin(_)
+    with Session() as s:
+        item = s.get(Run, id)
+        if item is None or not can_read_run(_, item):
+            raise HTTPException(404, "Training run not found")
+        if item.kind != "training":
+            raise HTTPException(409, "This run is not a CNN training run")
+        if item.status not in {"pending", "running"}:
+            raise HTTPException(409, f"Training run is already {item.status}")
+    with training_cancel_lock:
+        cancellation = training_cancel_events.get(id)
+        if cancellation is None:
+            raise HTTPException(409, "No active training worker owns this run")
+        cancellation.set()
+    audit("training_cancel_requested", id, _.id)
+    return {"id": id, "status": "running", "cancel_requested": True}
 
 
 @app.post("/models/select/{id}")

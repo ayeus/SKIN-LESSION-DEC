@@ -131,3 +131,7 @@ The report includes descriptive data and a held-out model comparison, residual c
 - If a selector says no compatible dataset is loaded, open **EHR & dataset management** and check the registry or import an authorized file with its actual source and license.
 - If a model-dependent action is disabled, open **Data & model status** to see whether its real model artifact is available.
 - For medical concerns, use a qualified healthcare professional. This app is not intended to guide care.
+
+### Stop a CNN training run
+
+Open **CNN training & evaluation (T5)**. The **Stop training** button is below **Start training experiment**. It is disabled when no CNN training run is active; when a run is active, the page finds it and enables the button. Stopping is cooperative and takes effect at safe checkpoints during setup and between training/evaluation batches. The run is recorded as cancelled; partial training artifacts are not selected as the active classifier.

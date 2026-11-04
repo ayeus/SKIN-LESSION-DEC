@@ -23,3 +23,4 @@ Screenshots were inspected visually. Full-page captures show a viewport-height f
 - `beginner-dashboard.png`: live dashboard with quick-start options and registry-derived data counts.
 - `beginner-weight-guide.png`: live T14–T15 module with the selected NHANES dataset, actual available columns and exact feature/outcome instructions.
 - `t6-organized-library.png`: live T6 grouped run library, category counts, search, and genuine persisted runs.
+- `cnn-stop-control.png`: live CNN training page showing the Stop training control and the accurate disabled state when there is no active run.

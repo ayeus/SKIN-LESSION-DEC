@@ -31,6 +31,67 @@ def test_missing_dataset_blocks_and_does_not_promote(monkeypatch, tmp_path):
         assert client.post("/models/select/not-present", headers=H).status_code == 404
 
 
+def test_active_training_can_be_stopped_and_persists_cancelled(monkeypatch, tmp_path):
+    import threading
+    import time
+    from backend.app import main as main_module
+    from backend.app.services import ml
+
+    started = threading.Event()
+    monkeypatch.setattr(
+        main_module.training, "readiness", lambda: {"ready": True}
+    )
+    monkeypatch.setattr(
+        main_module.training,
+        "source_paths",
+        lambda: (tmp_path / "metadata.csv", tmp_path / "images"),
+    )
+
+    def wait_for_stop(*args, cancel_check=None, **kwargs):
+        started.set()
+        deadline = time.monotonic() + 5
+        while not cancel_check() and time.monotonic() < deadline:
+            time.sleep(0.005)
+        if not cancel_check():
+            raise AssertionError("Cancellation was not delivered to the worker")
+        raise main_module.TrainingCancelled("Stopped at the user's request")
+
+    monkeypatch.setattr(ml, "train", wait_for_stop)
+    with TestClient(app) as client:
+        started_response = client.post(
+            "/training", headers=H, json={"epochs": 2, "batch_size": 4}
+        )
+        assert started_response.status_code == 200, started_response.text
+        run_id = started_response.json()["id"]
+        assert started.wait(3), "Training worker did not start"
+        stopped = client.post(f"/training/{run_id}/cancel", headers=H)
+        assert stopped.status_code == 200, stopped.text
+        assert stopped.json()["cancel_requested"] is True
+        for _ in range(300):
+            result = client.get(f"/runs/{run_id}", headers=H).json()
+            if result["status"] in {"cancelled", "failed", "completed"}:
+                break
+            time.sleep(0.01)
+        assert result["status"] == "cancelled", result
+        assert result["error"] == "Stopped at the user's request"
+
+
+def test_cnn_training_honors_cancellation_before_dataset_loading(tmp_path):
+    import pytest
+    from backend.app.main import TrainingCancelled
+    from backend.app.services.ml import train
+
+    artifact = tmp_path / "cancelled-artifact"
+    with pytest.raises(TrainingCancelled, match="user's request"):
+        train(
+            tmp_path / "missing-metadata.csv",
+            tmp_path / "missing-images",
+            artifact,
+            cancel_check=lambda: True,
+        )
+    assert not artifact.exists()
+
+
 def test_training_progress_artifact_selection_and_real_inference(monkeypatch, tmp_path):
     from backend.app.db import ROOT
 

@@ -130,7 +130,9 @@ def classifier_head(model, name):
     )
 
 
-def evaluate(model, name, labels, df, indices, loader, output, partition):
+def evaluate(
+    model, name, labels, df, indices, loader, output, partition, cancel_check=None
+):
     model.eval()
     truth = []
     scores = []
@@ -141,6 +143,8 @@ def evaluate(model, name, labels, df, indices, loader, output, partition):
     )
     with torch.no_grad():
         for x, y in loader:
+            if cancel_check:
+                cancel_check()
             truth += y.tolist()
             scores += model(x).softmax(1).tolist()
     handle.remove()
@@ -231,7 +235,15 @@ def train(
     progress_callback=None,
     defer_test=False,
     freeze_backbone=False,
+    cancel_check=None,
 ):
+    def check_cancelled():
+        if cancel_check and cancel_check():
+            from ..main import TrainingCancelled
+
+            raise TrainingCancelled("Stopped at the user's request")
+
+    check_cancelled()
     if not 1 <= epochs <= 1000 or not 1 <= batch_size <= 128:
         raise ValueError("Invalid epochs/batch size")
     training_source_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -243,6 +255,7 @@ def train(
     from .image_audit import audit_images
 
     audit = audit_images(df, images)
+    check_cancelled()
     if not audit["ready"]:
         raise ValueError(
             "Image content audit failed: invalid files or identical image pixels/bytes across groups require review"
@@ -250,6 +263,7 @@ def train(
     hashes = {row["encoded_sha256"] for row in audit["image_records"]}
     labels = sorted(df.label.unique())
     model = architecture(name, len(labels), pretrained)
+    check_cancelled()
     if freeze_backbone:
         if name == "small_cnn" or not pretrained:
             raise ValueError(
@@ -280,6 +294,7 @@ def train(
     best = float("inf")
     history = []
     for epoch in range(epochs):
+        check_cancelled()
         totals = []
         for phase, loader in enumerate(loaders[:2]):
             model.train(phase == 0)
@@ -292,6 +307,7 @@ def train(
             n = 0
             with torch.set_grad_enabled(phase == 0):
                 for x, y in loader:
+                    check_cancelled()
                     logits = model(x)
                     loss = loss_fn(logits, y)
                     if phase == 0:
@@ -316,6 +332,7 @@ def train(
         if progress_callback:
             progress_callback(history[-1])
     model.load_state_dict(torch.load(output / "weights.pt", weights_only=True))
+    check_cancelled()
     evaluation_partition = "validation" if defer_test else "test"
     evaluation = evaluate(
         model,
@@ -326,6 +343,7 @@ def train(
         loaders[1] if defer_test else loaders[2],
         output,
         evaluation_partition,
+        cancel_check=check_cancelled,
     )
     manifest = {
         "architecture": name,

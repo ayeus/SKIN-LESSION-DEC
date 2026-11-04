@@ -10,10 +10,18 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
   const [ready, setReady] = useState<Data | null>(null),
     [job, setJob] = useState<Data | null>(null),
     [error, setError] = useState(""),
-    [submitting, setSubmitting] = useState(false);
+    [submitting, setSubmitting] = useState(false),
+    [cancelling, setCancelling] = useState(false);
   async function check() {
     try {
       setReady(await api("/training/readiness"));
+      const runs = await api("/runs");
+      const active = runs.find(
+        (run: Data) =>
+          run.kind === "training" &&
+          ["pending", "running"].includes(run.status),
+      );
+      if (active) setJob(active);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -32,10 +40,16 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
         if (stopped) return;
         setJob(update);
         if (update.status === "completed") {
+          setCancelling(false);
           onResult(update);
           onChange();
         } else if (update.status === "failed") {
+          setCancelling(false);
           setError(update.error || "Training failed");
+          onChange();
+        } else if (update.status === "cancelled") {
+          setCancelling(false);
+          setError(update.error || "Training was stopped.");
           onChange();
         } else timer = setTimeout(poll, 1500);
       } catch (e) {
@@ -54,6 +68,7 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
     setSubmitting(true);
     const fields = new FormData(e.currentTarget);
     try {
+      setCancelling(false);
       setJob(
         await api("/training", {
           method: "POST",
@@ -71,6 +86,17 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
       setError((e as Error).message);
     } finally {
       setSubmitting(false);
+    }
+  }
+  async function stopTraining() {
+    if (!job?.id || cancelling) return;
+    setCancelling(true);
+    setError("");
+    try {
+      await api(`/training/${job.id}/cancel`, { method: "POST" });
+    } catch (e) {
+      setCancelling(false);
+      setError((e as Error).message);
     }
   }
   const active =
@@ -151,9 +177,26 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
           {active ? "Training job active" : "Start training experiment"}
         </button>
       </form>
+      <div className="training-actions">
+        <button
+          type="button"
+          className="stop-training"
+          disabled={!job?.id || !active || cancelling}
+          onClick={() => void stopTraining()}
+        >
+          {cancelling ? "Stopping training…" : "Stop training"}
+        </button>
+        <span role="status">
+          {cancelling
+            ? "Stop requested; training will stop at its next safe checkpoint."
+            : active
+              ? "A CNN training run is active."
+              : "No CNN training run is active."}
+        </span>
+      </div>
       {job && (
         <div role="status" className="notice">
-          Run {job.id}: {job.status}
+          Run {job.id}: {cancelling ? "stopping" : job.status}
           {job.result?.epoch && (
             <>
               <p>
@@ -170,11 +213,13 @@ export default function TrainingPanel({ api, onResult, onChange }: Props) {
               </p>
             </>
           )}
+          {job.error && job.status === "cancelled" && <p>{job.error}</p>}
         </div>
       )}
       <p className="notice">
         Only one training job runs at a time. Progress and failures persist in
-        Reports. Navigation stops polling, not training. Compare validation
+        Reports. Navigation stops polling, not training; use Stop training while
+        on this page to request cooperative cancellation. Compare validation
         evidence; repeated test-set selection biases results. Scores remain
         uncalibrated; clinical validation is not established.
       </p>
